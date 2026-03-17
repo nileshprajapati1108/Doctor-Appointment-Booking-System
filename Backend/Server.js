@@ -30,7 +30,10 @@ const PORT = process.env.PORT || 5000;
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: [
+      "http://localhost:5173",
+      "https://doctor-appointment-booking-system-kz2g.onrender.com"
+    ],
     credentials: true
   }
 });
@@ -52,9 +55,20 @@ app.use((req, res, next) => {
 
 // Middleware
 app.use(express.json());
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://doctor-appointment-booking-system-kz2g.onrender.com"
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:5173",
-  credentials: true // Allow credentials (cookies)
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed"));
+    }
+  },
+  credentials: true
 }));
 app.use(cookieParser());
 app.use(morgan("dev"));
