@@ -7,7 +7,8 @@ import {
   getDoctorById,
   updateAvailability,
   getDoctorDashboard,
-  getDoctorProfile
+  getDoctorProfile,
+  sendDoctorMessage
 } from "../controllers/doctorController.js";
 import { protect, doctorOnly } from "../middleware/authMiddleware.js";
 import { upload } from "../utils/multer.js";
@@ -39,6 +40,9 @@ router.get("/", getAllDoctors);
 
 // Dashboard must come before /:id to prevent /:id from catching /dashboard
 router.get("/dashboard", protect, doctorOnly, getDoctorDashboard);
+
+// Doctor messages
+router.post("/messages", protect, doctorOnly, sendDoctorMessage);
 
 router.get("/me", protect, doctorOnly, async (req, res) => {
   try {

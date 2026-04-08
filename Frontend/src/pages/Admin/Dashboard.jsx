@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   Stethoscope,
@@ -24,6 +24,7 @@ const STYLES = `
     --ad-blue-500: #3b82f6;
     --ad-blue-400: #60a5fa;
     --ad-blue-300: #93c5fd;
+    --ad-blue-200: #bfdbfe;
     --ad-blue-100: #dbeafe;
     --ad-blue-50:  #eff6ff;
     --ad-white:    #ffffff;
@@ -204,35 +205,56 @@ export default function AdminDashboard() {
     appointmentsToday: 0,
     monthlyRevenue: 0,
   });
+  const [trendCounts, setTrendCounts] = useState(Array(12).fill(0));
+  const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => { injectStyles(); }, []);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async (silent = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    if (silent) setIsRefreshing(true);
     try {
-      const doctorsRes = await API.get("/admin/doctors");
-      const patientsRes = await API.get("/admin/patients");
-      const appointmentsRes = await API.get("/appointments/all");
-
-      const doctors = Array.isArray(doctorsRes.data) ? doctorsRes.data.length : 0;
-      const patients = Array.isArray(patientsRes.data) ? patientsRes.data.length : 0;
-      const appointments = Array.isArray(appointmentsRes.data) ? appointmentsRes.data : [];
-
-      const today = new Date().toISOString().split("T")[0];
-      const appointmentsToday = appointments.filter((a) => a.date === today).length;
-      const revenue = appointments.reduce((sum, a) => sum + (a.fees || 0), 0);
-
-      setStats({ totalDoctors: doctors, totalPatients: patients, appointmentsToday, monthlyRevenue: revenue });
+      const res = await API.get("/admin/dashboard");
+      const data = res.data || {};
+      setStats(data.stats || { totalDoctors:0, totalPatients:0, appointmentsToday:0, monthlyRevenue:0 });
+      setTrendCounts(Array.isArray(data.trendCounts) ? data.trendCounts : Array(12).fill(0));
+      setActivities(Array.isArray(data.activities) ? data.activities : []);
+      setLastUpdated(new Date());
     } catch (error) {
-      console.error("Failed to fetch stats:", error);
+      console.error("Failed to fetch dashboard:", error);
     } finally {
       setLoading(false);
+      if (silent) setIsRefreshing(false);
+      isFetchingRef.current = false;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+
+    const pollId = setInterval(() => {
+      fetchStats(true);
+    }, 15000);
+
+    const onFocus = () => fetchStats(true);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchStats(true);
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(pollId);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [fetchStats]);
 
   if (loading) {
     return (
@@ -243,6 +265,8 @@ export default function AdminDashboard() {
   }
 
   const maxVal = Math.max(stats.totalDoctors, stats.totalPatients, stats.appointmentsToday, stats.monthlyRevenue / 1000, 1);
+  const maxTrend = Math.max(...trendCounts, 1);
+  const yAxisTicks = [3, 2, 1, 0].map((step) => Math.round((maxTrend * step) / 3));
 
   return (
     <div className="ad-root" style={{ minHeight: "100vh", background: "var(--ad-gray-50)", padding: "32px 28px" }}>
@@ -269,7 +293,8 @@ export default function AdminDashboard() {
               </div>
               <div style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 50, padding: "8px 18px", fontSize: 13, fontWeight: 500, color: "white", display: "flex", alignItems: "center", gap: 8 }}>
                 <TrendingUp size={15} />
-                Live Data
+                {isRefreshing ? "Syncing..." : "Live Data"}
+                {lastUpdated && !isRefreshing ? ` • ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
               </div>
             </div>
           </div>
@@ -312,10 +337,10 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── Bottom Grid ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20, alignItems: "stretch" }}>
 
           {/* Chart placeholder */}
-          <div className="ad-card ad-fade ad-d5" style={{ padding: "28px 28px" }}>
+          <div className="ad-card ad-fade ad-d5" style={{ padding: "28px 28px", minHeight: 430, display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
               <div>
                 <h2 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 19, color: "var(--ad-gray-900)", margin: "0 0 4px" }}>
@@ -328,33 +353,68 @@ export default function AdminDashboard() {
               </span>
             </div>
 
-            {/* Decorative bar chart mockup */}
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 180, padding: "0 8px 0", borderBottom: "2px solid var(--ad-gray-100)", marginBottom: 12 }}>
-              {[40,65,50,80,60,90,55,70,85,50,75,95].map((h, i) => (
-                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "34px 1fr", gap: 10, marginBottom: 12, flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "flex-end", padding: "6px 0 8px" }}>
+                {yAxisTicks.map((tick, idx) => (
+                  <span key={`${tick}-${idx}`} style={{ fontSize: 10, color: "var(--ad-gray-400)", fontWeight: 700, lineHeight: 1 }}>
+                    {tick}
+                  </span>
+                ))}
+              </div>
+
+              <div style={{ position: "relative", borderLeft: "1px solid var(--ad-gray-200)", borderBottom: "2px solid var(--ad-gray-100)", borderRadius: "0 0 8px 0", padding: "8px 10px 0" }}>
+                {[25, 50, 75].map((pct) => (
                   <div
+                    key={pct}
                     style={{
-                      width: "100%",
-                      height: `${h}%`,
-                      background: i === 11
-                        ? "linear-gradient(180deg,#3b82f6,#1e4d99)"
-                        : "linear-gradient(180deg,var(--ad-blue-200),var(--ad-blue-100))",
-                      borderRadius: "6px 6px 0 0",
-                      transition: "height 0.8s ease",
+                      position: "absolute",
+                      left: 10,
+                      right: 10,
+                      bottom: `${pct}%`,
+                      borderTop: "1px dashed var(--ad-gray-100)",
                     }}
                   />
+                ))}
+
+                <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", alignItems: "flex-end", gap: 10 }}>
+                  {trendCounts.map((count, i) => {
+                    const h = Math.round((count / maxTrend) * 100);
+                    const barHeight = count > 0 ? Math.max(h, 8) : 0;
+                    const currentMonth = new Date().getMonth();
+
+                    return (
+                      <div key={i} style={{ flex: 1, height: "100%", display: "flex", alignItems: "flex-end" }}>
+                        <div
+                          title={`${count} appointments`}
+                          style={{
+                            width: "100%",
+                            height: `${barHeight}%`,
+                            background: i === currentMonth
+                              ? "linear-gradient(180deg,#3b82f6,#1e4d99)"
+                              : "linear-gradient(180deg,var(--ad-blue-200),var(--ad-blue-100))",
+                            borderRadius: "8px 8px 0 0",
+                            transition: "height 0.8s ease",
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "0 8px" }}>
-              {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map(m => (
-                <span key={m} style={{ fontSize: 10, color: "var(--ad-gray-400)", fontWeight: 600 }}>{m}</span>
-              ))}
+
+            <div style={{ display: "grid", gridTemplateColumns: "34px 1fr", gap: 10 }}>
+              <div />
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "0 2px" }}>
+                {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map(m => (
+                  <span key={m} style={{ fontSize: 10, color: "var(--ad-gray-400)", fontWeight: 600 }}>{m}</span>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Activity feed */}
-          <div className="ad-card ad-fade ad-d6" style={{ padding: "28px 24px" }}>
+          <div className="ad-card ad-fade ad-d6" style={{ padding: "28px 24px", minHeight: 430 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
               <h2 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 19, color: "var(--ad-gray-900)", margin: 0 }}>
                 Recent Activity
@@ -362,10 +422,9 @@ export default function AdminDashboard() {
               <div style={{ width: 8, height: 8, background: "#22c55e", borderRadius: "50%", boxShadow: "0 0 0 3px #dcfce7" }} />
             </div>
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              <ActivityItem emoji="✅" bg="#f0fdf4" text="New doctor <b>Dr. Smith</b> added" time="2 minutes ago" border />
-              <ActivityItem emoji="📅" bg="var(--ad-blue-50)" text="Appointment booked by <b>John Doe</b>" time="15 minutes ago" border />
-              <ActivityItem emoji="🧾" bg="#fefce8" text="Invoice <b>#12345</b> generated" time="1 hour ago" border />
-              <ActivityItem emoji="⚙️" bg="var(--ad-gray-100)" text="Admin updated system settings" time="3 hours ago" border={false} />
+              {activities.slice(0, 5).map((a, idx, arr) => (
+                <ActivityItem key={idx} emoji={a.emoji} bg={a.bg} text={a.text} time={a.time} border={idx !== arr.length - 1} />
+              ))}
             </ul>
 
             {/* Mini divider + summary */}

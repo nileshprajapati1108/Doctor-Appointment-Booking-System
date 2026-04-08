@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useSiteName } from "../utils/siteName";
 
 export default function PublicHeader({ sticky = false }) {
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
+  const siteName = useSiteName();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -54,7 +56,7 @@ export default function PublicHeader({ sticky = false }) {
           </div>
           <div>
             <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "#1e3a5f", fontFamily: "'Sora', 'DM Sans', sans-serif" }}>
-              Happy Health
+              {siteName}
             </p>
             <p style={{ margin: 0, fontSize: "10px", color: "#94a3b8" }}>Care that makes you smile</p>
           </div>

@@ -7,6 +7,7 @@ import {
 import { useSelector, useDispatch } from "react-redux";
 import { logout } from "../../Redux/authSlice";
 import API from "../util/api";
+import { useSiteName } from "../../utils/siteName";
 
 export default function DoctorSidebar() {
   const location = useLocation();
@@ -15,8 +16,12 @@ export default function DoctorSidebar() {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const dropdownRef = useRef(null);
+  const siteName = useSiteName();
+  const siteInitial = siteName.trim().charAt(0).toUpperCase() || "H";
 
   const { user } = useSelector((state) => state.auth);
+  const doctorProfile = useSelector((state) => state.doctor?.profile);
+  const avatarUrl = user?.profileImage || doctorProfile?.profileImage || "";
 
   const navItems = [
     { path: "/doctor", label: "Dashboard", icon: <Home size={18} />, exact: true },
@@ -72,7 +77,7 @@ export default function DoctorSidebar() {
                 background: "linear-gradient(135deg, #2563eb, #38bdf8)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "#fff", fontWeight: "800", fontSize: "17px", flexShrink: 0,
-              }}>H</div>
+              }}>{siteInitial}</div>
               <button
                 onClick={() => setCollapsed(false)}
                 title="Expand sidebar"
@@ -95,10 +100,10 @@ export default function DoctorSidebar() {
                   background: "linear-gradient(135deg, #2563eb, #38bdf8)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: "#fff", fontWeight: "800", fontSize: "16px", flexShrink: 0,
-                }}>H</div>
+                }}>{siteInitial}</div>
                 <div style={{ minWidth: 0 }}>
                   <h1 style={{ fontSize: "15px", fontWeight: "700", color: "#1e3a5f", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    Happy Health
+                    {siteName}
                   </h1>
                   <p style={{ fontSize: "10px", color: "#64748b", margin: 0 }}>Doctor Portal</p>
                 </div>
@@ -247,7 +252,15 @@ export default function DoctorSidebar() {
             color: "#fff", fontWeight: "700", fontSize: "14px", flexShrink: 0,
             boxShadow: "0 2px 8px rgba(37,99,235,0.25)",
           }}>
-            {user?.name?.charAt(0)?.toUpperCase() || "D"}
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={user?.name || "Doctor"}
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+              />
+            ) : (
+              user?.name?.charAt(0)?.toUpperCase() || "D"
+            )}
           </div>
 
           {!collapsed && (

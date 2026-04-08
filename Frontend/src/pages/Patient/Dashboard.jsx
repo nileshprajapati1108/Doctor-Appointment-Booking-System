@@ -1,8 +1,7 @@
 // src/pages/Patient/Dashboard.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../util/api";
-import { useSelector } from "react-redux";
 import { Calendar, Clock, Star, Wallet, Stethoscope, Activity, Bell, Heart } from "lucide-react";
 
 export default function PatientDashboard() {
@@ -15,30 +14,111 @@ export default function PatientDashboard() {
   const [reminders, setReminders] = useState([]);
   const auth = JSON.parse(localStorage.getItem("auth"));
   const user = auth?.user || null;
+  const savedKey = user?._id ? `savedDoctors:${user._id}` : "savedDoctors:guest";
+
+  const readSavedDoctors = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(savedKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [savedKey]);
+
+  const timeAgo = (value) => {
+    if (!value) return "";
+    const ts = new Date(value).getTime();
+    if (Number.isNaN(ts)) return "";
+    const diffMs = Date.now() - ts;
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins} min ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} hr ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days !== 1 ? "s" : ""} ago`;
+  };
+
+  const statusLabel = (status) => {
+    const s = (status || "").toLowerCase();
+    if (s === "approved") return "appointment approved";
+    if (s === "pending") return "appointment requested";
+    if (s === "arrived") return "checked in";
+    if (s === "consultation-started" || s === "in-progress") return "consultation started";
+    if (s === "consultation-completed") return "consultation completed";
+    if (s === "completed") return "appointment completed";
+    if (s === "cancelled") return "appointment cancelled";
+    if (s === "rejected") return "appointment rejected";
+    if (s === "rescheduled") return "appointment rescheduled";
+    if (s === "no-show") return "marked as no-show";
+    return "appointment updated";
+  };
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await API.get("/appointments/my");
+      const remindersRes = await API.get("/appointments/my/reminders");
+      const appts = res.data || [];
+      const saved = readSavedDoctors();
+      const reminderData = Array.isArray(remindersRes.data) ? remindersRes.data : [];
+      const fallbackReminders = appts.filter((a) => (a.status || "").toLowerCase() === "approved");
+      setReminders(reminderData.length ? reminderData : fallbackReminders);
+      setUpcoming(appts.slice(0, 4));
+      setSavedDoctors(saved);
+
+      const activeAppointments = appts.filter((a) => {
+        const s = (a.status || "").toLowerCase();
+        return !["completed", "consultation-completed", "cancelled", "rejected", "no-show"].includes(s);
+      }).length;
+      const totalSpent = appts
+        .filter((a) => {
+          const s = (a.status || "").toLowerCase();
+          return !["cancelled", "rejected", "no-show"].includes(s);
+        })
+        .reduce((s, a) => s + (a.fees || a.fee || 0), 0);
+      const ratings = appts.map((a) => a.review?.rating).filter((val) => typeof val === "number");
+      const avgRating = ratings.length ? (ratings.reduce((s, r) => s + r, 0) / ratings.length) : null;
+
+      const recent = [...appts]
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
+        .slice(0, 5)
+        .map((a) => ({
+          doctor: a.doctor?.user?.name || a.doctorName || "Doctor",
+          action: statusLabel(a.status),
+          timeAgo: timeAgo(a.updatedAt || a.createdAt),
+        }));
+
+      setActivity(recent);
+      setStats({
+        activeAppointments,
+        totalSpent,
+        savedDoctors: saved.length,
+        avgRating: avgRating !== null ? avgRating.toFixed(1) : "—",
+      });
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+    }
+  }, [readSavedDoctors, statusLabel, timeAgo]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await API.get("/appointments/my");
-        const remindersRes = await API.get("/appointments/my/reminders");
-        const appts = res.data || [];
-        setReminders(remindersRes.data || []);
-        setUpcoming(appts.slice(0, 4));
-        setActivity([]);
-        setSavedDoctors([]);
+    fetchData();
 
-        const activeAppointments = appts.filter(a => a.status && a.status !== "completed").length;
-        const totalSpent = appts.reduce((s, a) => s + (a.fees || a.fee || 0), 0);
-        const avgRating = appts.reduce((s, a) => s + (a.doctor?.rating || 0), 0) / (appts.length || 1);
-
-        setStats({ activeAppointments, totalSpent, savedDoctors: 0, avgRating: avgRating.toFixed(1) });
-      } catch (err) {
-        console.error("Dashboard fetch error:", err);
-      }
+    const intervalId = setInterval(fetchData, 30000);
+    const handleFocus = () => fetchData();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchData();
     };
 
-    fetchData();
-  }, []);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [fetchData]);
 
   const statCards = [
     {
@@ -84,6 +164,10 @@ export default function PatientDashboard() {
     if (s === "cancelled") return { color: "#dc2626", bg: "#fef2f2" };
     return { color: "#64748b", bg: "#f1f5f9" };
   };
+
+  const getDoctorName = (app) => app?.doctor?.user?.name || app?.doctorName || "Doctor";
+  const getDoctorImage = (app) => app?.doctor?.profileImage || app?.doctor?.user?.profileImage || app?.doctorImage || "";
+  const getDoctorSpecialty = (app) => app?.doctor?.specialization || app?.specialty || "General";
 
   return (
     <div
@@ -174,7 +258,7 @@ export default function PatientDashboard() {
           {upcoming[0] ? (
             <>
               <p style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#fff" }}>
-                {upcoming[0].doctorName}
+                {getDoctorName(upcoming[0])}
               </p>
               <p style={{ margin: "4px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>
                 {upcoming[0].date} · {upcoming[0].time}
@@ -290,22 +374,27 @@ export default function PatientDashboard() {
                             background: "linear-gradient(135deg, #2563eb, #38bdf8)",
                             display: "flex", alignItems: "center", justifyContent: "center",
                             color: "#fff", fontWeight: "700", fontSize: "15px", flexShrink: 0,
+                            overflow: "hidden",
                           }}
                         >
-                          {(app.doctorName || "D").charAt(0)}
+                          {getDoctorImage(app) ? (
+                            <img src={getDoctorImage(app)} alt={getDoctorName(app)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ) : (
+                            getDoctorName(app).charAt(0)
+                          )}
                         </div>
                         <div>
                           <p style={{ margin: 0, fontSize: "14px", fontWeight: "600", color: "#1e3a5f" }}>
-                            {app.doctorName}
+                            {getDoctorName(app)}
                           </p>
                           <p style={{ margin: "3px 0 0", fontSize: "12px", color: "#64748b" }}>
-                            {app.specialty} · {app.date} {app.time}
+                            {getDoctorSpecialty(app)} · {app.date} {app.time}
                           </p>
                         </div>
                       </div>
                       <div style={{ textAlign: "right", flexShrink: 0 }}>
                         <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#2563eb" }}>
-                          ₹{app.fee}
+                          ₹{app.fees ?? app.fee ?? 0}
                         </p>
                         <span
                           style={{
@@ -430,7 +519,7 @@ export default function PatientDashboard() {
                       <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#64748b" }}>{doc.specialty}</p>
                     </div>
                     <button
-                      onClick={() => navigate(`/doctor/${doc._id}`)}
+                      onClick={() => navigate(`/patient/doctor/${doc._id}`, { state: { backTo: "/patient" } })}
                       style={{
                         padding: "6px 14px", borderRadius: "8px",
                         background: "#eff6ff", border: "1px solid #bfdbfe",

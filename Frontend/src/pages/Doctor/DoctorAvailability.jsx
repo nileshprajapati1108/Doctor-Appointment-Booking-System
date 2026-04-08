@@ -39,7 +39,7 @@ const LBL = { display:"block", fontSize:"11px", fontWeight:"700", color:"#64748b
 const TABS = [
   { key:'weekly',    label:'Weekly Schedule', icon:<Clock size={15}/> },
   { key:'exceptions',label:'Date Exceptions',  icon:<Calendar size={15}/> },
-  { key:'preview',   label:'Preview Slots',    icon:<Eye size={15}/> },
+  // { key:'preview',   label:'Preview Slots',    icon:<Eye size={15}/> },
 ];
 
 /* ─── main ─── */
@@ -62,9 +62,9 @@ const DoctorAvailability = () => {
   const [exBreakDuration, setExBreakDuration] = useState(60);
 
   // Preview
-  const [previewDate,  setPreviewDate]  = useState('');
-  const [previewSlots, setPreviewSlots] = useState([]);
-  const [loadingSlots, setLoadingSlots] = useState(false);
+  // const [previewDate,  setPreviewDate]  = useState('');
+  // const [previewSlots, setPreviewSlots] = useState([]);
+  // const [loadingSlots, setLoadingSlots] = useState(false);
 
   const token = JSON.parse(localStorage.getItem("auth"))?.token;
   const api = useMemo(() => axios.create({
@@ -118,13 +118,13 @@ const DoctorAvailability = () => {
 
   const removeException = (date) => setAvailability({ ...availability, exceptions: availability.exceptions.filter(e => e.date !== date) });
 
-  const fetchPreviewSlots = async () => {
-    if (!previewDate) return;
-    setLoadingSlots(true);
-    try { const { data } = await api.get(`/doctors/slots?date=${previewDate}`); setPreviewSlots(data.slots || []); }
-    catch (e) { console.error(e); }
-    finally { setLoadingSlots(false); }
-  };
+  // const fetchPreviewSlots = async () => {
+  //   if (!previewDate) return;
+  //   setLoadingSlots(true);
+  //   try { const { data } = await api.get(`/doctors/slots?date=${previewDate}`); setPreviewSlots(data.slots || []); }
+  //   catch (e) { console.error(e); }
+  //   finally { setLoadingSlots(false); }
+  // };
 
   const activeDays = availability.weekly.filter(d => d.isActive).length;
 
@@ -373,7 +373,7 @@ const DoctorAvailability = () => {
               )}
 
               {/* ══ PREVIEW TAB ══ */}
-              {activeTab==='preview'&&(
+              {/* {activeTab==='preview'&&(
                 <Reveal delay={0}>
                   <div>
                     <div style={{ display:"flex", alignItems:"flex-end", gap:"12px", marginBottom:"24px", flexWrap:"wrap" }}>
@@ -408,7 +408,7 @@ const DoctorAvailability = () => {
                     ):null}
                   </div>
                 </Reveal>
-              )}
+              )} */}
             </div>
           </div>
         </Reveal>

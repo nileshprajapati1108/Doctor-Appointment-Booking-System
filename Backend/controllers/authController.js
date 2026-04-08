@@ -138,6 +138,7 @@ export const loginUser = async (req, res) => {
       name: user.name,
       email: user.email,
       profileImage: user.profileImage,
+      medicalHistory: user.medicalHistory,
       role: user.role,
       token: generateToken(user._id, user.role),
       mustResetPassword: false,
@@ -169,6 +170,7 @@ export const verifyAuth = async (req, res) => {
       name: user.name,
       email: user.email,
       profileImage: user.profileImage,
+      medicalHistory: user.medicalHistory,
       role: user.role,
       token: generateToken(user._id, user.role),
     });

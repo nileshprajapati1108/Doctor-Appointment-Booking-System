@@ -59,6 +59,10 @@ const appointmentSchema = new mongoose.Schema({
     default: "pending"
   },
 
+  cancellationReason: { type: String, default: "" },
+  cancelledBy: { type: String, default: "" },
+  cancelledAt: { type: Date, default: null },
+
   fees: { type: Number, default: 0 },
 
   // 🩺 NEW: Medical Records (for completed appointments)

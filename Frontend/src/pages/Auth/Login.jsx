@@ -7,12 +7,15 @@ import { setDoctorProfile } from "../../Redux/doctorSlice";
 import { setPatientData } from "../../Redux/patientSlice";
 import { showToast } from "../../Redux/toastSlice";
 import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
+import { useSiteName } from "../../utils/siteName";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const siteName = useSiteName();
+  const siteInitial = siteName.trim().charAt(0).toUpperCase() || "H";
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -120,12 +123,12 @@ export default function Login() {
             margin: "0 auto 14px",
             boxShadow: "0 6px 20px rgba(37,99,235,0.3)",
             fontFamily: "'Sora', sans-serif",
-          }}>H</div>
+          }}>{siteInitial}</div>
           <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: "#1e3a5f", fontFamily: "'Sora', sans-serif" }}>
             Welcome Back
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: "13px", color: "#64748b" }}>
-            Sign in to your Happy Health account
+            Sign in to your {siteName} account
           </p>
         </div>
 

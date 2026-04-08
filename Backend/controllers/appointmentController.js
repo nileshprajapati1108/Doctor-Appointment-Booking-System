@@ -72,36 +72,42 @@ export const bookAppointment = async (req, res) => {
     }
 
     const availability = await DoctorAvailability.findOne({ doctorId: doctorIdFromSlot });
-    const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(dateFromSlot).getDay()];
-    const exception = (availability?.exceptions || []).find((item) => item?.date === dateFromSlot);
-    let generatedSlots = [];
+    // Only enforce schedule-based slot validation when a DoctorAvailability
+    // document exists. Older doctors may rely solely on the legacy
+    // doctor.availability field, and in that case we trust the slot token
+    // and rely on double-book checks instead of rejecting every booking.
+    if (availability) {
+      const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(dateFromSlot).getDay()];
+      const exception = (availability.exceptions || []).find((item) => item?.date === dateFromSlot);
+      let generatedSlots = [];
 
-    if (exception) {
-      if (!exception.isUnavailable) {
-        generatedSlots = generateSlots({
-          startTime: exception.startTime,
-          endTime: exception.endTime,
-          breakEnabled: exception.hasBreak,
-          breakStartTime: exception.breakStart,
-          breakDuration: exception.breakDuration
-        });
+      if (exception) {
+        if (!exception.isUnavailable) {
+          generatedSlots = generateSlots({
+            startTime: exception.startTime,
+            endTime: exception.endTime,
+            breakEnabled: exception.hasBreak,
+            breakStartTime: exception.breakStart,
+            breakDuration: exception.breakDuration
+          });
+        }
+      } else {
+        const weekly = (availability.weekly || []).find((item) => item?.day === dayName && item?.isActive);
+        if (weekly) {
+          generatedSlots = generateSlots({
+            startTime: weekly.startTime,
+            endTime: weekly.endTime,
+            breakEnabled: weekly.hasBreak,
+            breakStartTime: weekly.breakStart,
+            breakDuration: weekly.breakDuration
+          });
+        }
       }
-    } else {
-      const weekly = (availability?.weekly || []).find((item) => item?.day === dayName && item?.isActive);
-      if (weekly) {
-        generatedSlots = generateSlots({
-          startTime: weekly.startTime,
-          endTime: weekly.endTime,
-          breakEnabled: weekly.hasBreak,
-          breakStartTime: weekly.breakStart,
-          breakDuration: weekly.breakDuration
-        });
-      }
-    }
 
-    const slotCheck = generatedSlots.find((slot) => slot.startTime === startTimeFromSlot);
-    if (!slotCheck) {
-      return res.status(400).json({ message: "Slot unavailable or already booked" });
+      const slotCheck = generatedSlots.find((slot) => slot.startTime === startTimeFromSlot);
+      if (!slotCheck) {
+        return res.status(400).json({ message: "Slot unavailable or already booked" });
+      }
     }
 
     const doubleBookCheck = await Appointment.findOne({
@@ -172,8 +178,8 @@ export const bookAppointment = async (req, res) => {
     const populatedAppointment = await Appointment.findById(appointment._id)
       .populate({
         path: "doctor",
-        select: "hospitalClinicName specialization location fees",
-        populate: { path: "user", select: "name email" }
+        select: "hospitalClinicName specialization location fees profileImage",
+        populate: { path: "user", select: "name email profileImage" }
       })
       .populate("patient", "name email");
 
@@ -186,7 +192,22 @@ export const bookAppointment = async (req, res) => {
 export const getAppointmentById = async (req, res) => {
   try {
     const appointment = await Appointment.findOne({ _id: req.params.id, patient: req.user._id })
-      .populate({ path: "doctor", select: "hospitalClinicName specialization location fees", populate: { path: "user", select: "name email" } })
+      .populate({ path: "doctor", select: "hospitalClinicName specialization location fees profileImage", populate: { path: "user", select: "name email profileImage" } })
+      .populate("patient", "name email")
+      .populate("prescription")
+      .populate("review");
+
+    if (!appointment) return res.status(404).json({ message: "Appointment not found" });
+    res.json(appointment);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getAppointmentByIdAdmin = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id)
+      .populate({ path: "doctor", select: "hospitalClinicName specialization location fees user profileImage", populate: { path: "user", select: "name email profileImage" } })
       .populate("patient", "name email")
       .populate("prescription")
       .populate("review");
@@ -201,11 +222,11 @@ export const getAppointmentById = async (req, res) => {
 export const getPatientAppointments = async (req, res) => {
   try {
     const appointments = await Appointment.find({ patient: req.user._id })
-      .populate({ path: "doctor", select: "specialization fees user", populate: { path: "user", select: "name email" } })
+      .populate({ path: "doctor", select: "specialization fees user profileImage", populate: { path: "user", select: "name email profileImage" } })
       .populate("patient", "name email")
       .populate("prescription")
       .populate("review")
-      .sort({ date: -1, time: 1 });
+      .sort({ date: -1, time: -1, createdAt: -1 });
 
     res.json(appointments);
   } catch (error) {
@@ -221,7 +242,7 @@ export const getPatientReminders = async (req, res) => {
       "reminderHistory.0": { $exists: true }
     })
       .select("date time status reminderHistory doctor")
-      .populate({ path: "doctor", select: "specialization user", populate: { path: "user", select: "name" } })
+      .populate({ path: "doctor", select: "specialization user profileImage", populate: { path: "user", select: "name profileImage" } })
       .sort({ date: 1, time: 1 });
 
     res.json(reminders);
@@ -232,6 +253,8 @@ export const getPatientReminders = async (req, res) => {
 
 export const cancelAppointment = async (req, res) => {
   try {
+    const { reason } = req.body || {};
+
     const appointment = await findAppointmentForPatient(req.params.id, req.user._id, [
       { path: "doctor", select: "user" },
       { path: "patient", select: "name" }
@@ -250,6 +273,9 @@ export const cancelAppointment = async (req, res) => {
 
     const fromStatus = appointment.status;
     appointment.status = APPOINTMENT_STATUS.CANCELLED;
+    appointment.cancellationReason = String(reason || "Cancelled by patient").trim();
+    appointment.cancelledBy = "patient";
+    appointment.cancelledAt = new Date();
     await appointment.save();
 
     await releaseSlotIfExists(appointment.slotId);
@@ -260,7 +286,8 @@ export const cancelAppointment = async (req, res) => {
       actorRole: "patient",
       action: "appointment-cancelled",
       fromStatus,
-      toStatus: APPOINTMENT_STATUS.CANCELLED
+      toStatus: APPOINTMENT_STATUS.CANCELLED,
+      metadata: { reason: appointment.cancellationReason }
     });
 
     res.json({ message: "Appointment cancelled successfully", appointment });
@@ -381,7 +408,7 @@ export const getDoctorAppointments = async (req, res) => {
 
     const appointments = await Appointment.find({ doctor: doctorDoc._id })
       .populate("patient", "name email medicalHistory")
-      .populate({ path: "doctor", select: "specialization fees user", populate: { path: "user", select: "name email" } })
+      .populate({ path: "doctor", select: "specialization fees user profileImage", populate: { path: "user", select: "name email profileImage" } })
       .populate("prescription")
       .populate("review")
       .sort({ date: -1, time: 1 });
@@ -395,7 +422,7 @@ export const getDoctorAppointments = async (req, res) => {
 export const getAllAppointments = async (req, res) => {
   try {
     const appointments = await Appointment.find()
-      .populate({ path: "doctor", select: "specialization fees user", populate: { path: "user", select: "name email" } })
+      .populate({ path: "doctor", select: "specialization fees user profileImage", populate: { path: "user", select: "name email profileImage" } })
       .populate("patient", "name email")
       .sort({ date: -1, time: 1 });
 
@@ -466,6 +493,9 @@ export const adminCancelAppointment = async (req, res) => {
 
     const fromStatus = appointment.status;
     appointment.status = APPOINTMENT_STATUS.CANCELLED;
+    appointment.cancellationReason = String(reason).trim() || "Cancelled by admin";
+    appointment.cancelledBy = "admin";
+    appointment.cancelledAt = new Date();
     await appointment.save();
 
     if (appointment.slotId) {
@@ -604,7 +634,7 @@ export const adminDeleteAppointment = async (req, res) => {
 
 export const updateAppointmentStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, reason } = req.body;
 
     const validStatuses = Object.values(APPOINTMENT_STATUS);
     if (!validStatuses.includes(status)) {
@@ -652,6 +682,13 @@ export const updateAppointmentStatus = async (req, res) => {
 
     const fromStatus = appointment.status;
     appointment.status = status;
+
+    if (status === APPOINTMENT_STATUS.CANCELLED) {
+      appointment.cancellationReason = String(reason || "Cancelled by doctor").trim();
+      appointment.cancelledBy = "doctor";
+      appointment.cancelledAt = new Date();
+    }
+
     await appointment.save();
 
     if ([APPOINTMENT_STATUS.CANCELLED, APPOINTMENT_STATUS.NO_SHOW].includes(status) && appointment.slotId) {
@@ -664,8 +701,30 @@ export const updateAppointmentStatus = async (req, res) => {
       actorRole: "doctor",
       action: "doctor-status-update",
       fromStatus,
-      toStatus: status
+      toStatus: status,
+      metadata: status === APPOINTMENT_STATUS.CANCELLED
+        ? { reason: appointment.cancellationReason }
+        : undefined
     });
+
+    if (status === APPOINTMENT_STATUS.CANCELLED) {
+      const doctorName = appointment.doctor?.user?.name || "Doctor";
+      const patientName = appointment.patient?.name || "Patient";
+
+      try {
+        if (appointment.patient?.email) {
+          await sendEmail(
+            appointment.patient.email,
+            "Appointment Cancelled by Doctor",
+            `<h3>Hello ${patientName},</h3>
+             <p>Your appointment with <b>Dr. ${doctorName}</b> on <b>${appointment.date}</b> at <b>${appointment.time}</b> has been cancelled by the doctor.</p>
+             <p>Reason: ${appointment.cancellationReason}</p>`
+          );
+        }
+      } catch (emailError) {
+        console.error("Doctor cancel email failed:", emailError.message);
+      }
+    }
 
     if (req.io) {
       req.io.emit("appointmentStatusUpdate", {

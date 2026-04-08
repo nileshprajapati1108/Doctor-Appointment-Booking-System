@@ -7,6 +7,7 @@ import { loginSuccess } from "../../Redux/authSlice";
 import { setPatientData } from "../../Redux/patientSlice";
 import Loader from "../../Componet/Loader";
 import { User, Mail, Lock, Eye, EyeOff, Loader2, ShieldCheck, ArrowRight } from "lucide-react";
+import { useSiteName } from "../../utils/siteName";
 
 export default function Signup() {
   const [stage, setStage] = useState("signup");
@@ -18,6 +19,8 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const siteName = useSiteName();
+  const siteInitial = siteName.trim().charAt(0).toUpperCase() || "H";
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -226,9 +229,9 @@ export default function Signup() {
             margin: "0 auto 14px",
             boxShadow: "0 6px 20px rgba(37,99,235,0.3)",
             fontFamily: "'Sora', sans-serif",
-          }}>H</div>
+          }}>{siteInitial}</div>
           <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: "#1e3a5f", fontFamily: "'Sora', sans-serif" }}>
-            Join Happy Health
+            Join {siteName}
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: "13px", color: "#64748b" }}>
             Create your patient account to get started

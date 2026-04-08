@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import PublicHeader from "../Componet/PublicHeader";
 import PublicFooter from "../Componet/PublicFooter";
+import { useSiteName } from "../utils/siteName";
 
 /* ─────────────────────────────────────────
    Lazy-reveal hook + wrapper
@@ -71,6 +72,7 @@ const CheckItem = ({ text, color = "#2563eb" }) => (
 ───────────────────────────────────────── */
 export default function HowItWorks() {
   const navigate = useNavigate();
+  const siteName = useSiteName();
 
   const S = { // shared section wrapper style
     padding: "88px 24px",
@@ -110,7 +112,7 @@ export default function HowItWorks() {
             }}>
               How{" "}
               <span style={{ background: "linear-gradient(135deg,#2563eb,#38bdf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                Happy Health
+                {siteName}
               </span>{" "}
               Works
             </h1>
@@ -349,7 +351,7 @@ export default function HowItWorks() {
               Ready to Get Started?
             </h2>
             <p style={{ fontSize: "17px", color: "rgba(255,255,255,0.8)", margin: "0 0 36px", lineHeight: 1.65 }}>
-              Join thousands of patients and doctors using Happy Health today!
+              Join thousands of patients and doctors using {siteName} today!
             </p>
             <div style={{ display: "flex", gap: "14px", justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={() => navigate("/signup")} style={{ padding: "14px 36px", borderRadius: "12px", background: "#fff", color: "#2563eb", fontWeight: "700", fontSize: "15px", border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 6px 20px rgba(0,0,0,0.15)", transition: "all 0.2s" }}

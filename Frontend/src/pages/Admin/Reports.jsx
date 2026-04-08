@@ -47,6 +47,8 @@ const toMonthLabel = (monthKey) => {
 
 const formatINR = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
 
+const REVENUE_EXCLUDED_STATUSES = new Set(["cancelled", "rejected", "no-show"]);
+
 const getValidAppointmentDate = (appointment) => {
   if (appointment?.date) {
     const fromDateField = new Date(appointment.date);
@@ -110,7 +112,12 @@ export default function Reports() {
         const patients = Array.isArray(patientsRes.data) ? patientsRes.data : [];
         const appointments = Array.isArray(appointmentsRes.data) ? appointmentsRes.data : [];
 
-        const totalRevenue = appointments.reduce((sum, item) => sum + Number(item?.fees || 0), 0);
+        const revenueAppointments = appointments.filter((item) => {
+          const status = String(item?.status || "").toLowerCase();
+          return !REVENUE_EXCLUDED_STATUSES.has(status);
+        });
+
+        const totalRevenue = revenueAppointments.reduce((sum, item) => sum + Number(item?.fees || 0), 0);
 
         setStats({
           totalDoctors: doctors.length,
@@ -120,7 +127,7 @@ export default function Reports() {
         });
 
         const byMonth = new Map();
-        appointments.forEach((item) => {
+        revenueAppointments.forEach((item) => {
           const validDate = getValidAppointmentDate(item);
           if (!validDate) return;
           const monthKey = toMonthKey(validDate);

@@ -1,5 +1,5 @@
 // src/pages/DoctorDashboard.jsx
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../util/api";
 import {
@@ -70,28 +70,48 @@ export default function DoctorDashboard() {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const { data } = await API.get("/doctors/dashboard");
-        setDashboard({
-          totalEarnings: data?.totalEarnings ?? 0,
-          thisMonthEarnings: data?.thisMonthEarnings ?? 0,
-          appointmentsCount: data?.appointmentsCount ?? 0,
-          activePatients: data?.activePatients ?? 0,
-          recentBookings: data?.recentBookings ?? [],
-          averageRating: data?.averageRating ?? "0.0",
-          appointmentSuccessRate: data?.appointmentSuccessRate ?? 0,
-          avgResponseTime: data?.avgResponseTime ?? 24,
-        });
-      } catch (err) {
-        console.error("Failed to fetch dashboard:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDashboard();
+  const fetchDashboard = useCallback(async (showLoader = false) => {
+    try {
+      if (showLoader) setLoading(true);
+      const { data } = await API.get("/doctors/dashboard");
+      setDashboard({
+        totalEarnings: data?.totalEarnings ?? 0,
+        thisMonthEarnings: data?.thisMonthEarnings ?? 0,
+        appointmentsCount: data?.appointmentsCount ?? 0,
+        activePatients: data?.activePatients ?? 0,
+        recentBookings: data?.recentBookings ?? [],
+        averageRating: data?.averageRating ?? "0.0",
+        appointmentSuccessRate: data?.appointmentSuccessRate ?? 0,
+        avgResponseTime: data?.avgResponseTime ?? 24,
+      });
+    } catch (err) {
+      console.error("Failed to fetch dashboard:", err);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDashboard(true);
+
+    const intervalId = setInterval(() => {
+      fetchDashboard(false);
+    }, 30000);
+
+    const handleFocus = () => fetchDashboard(false);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchDashboard(false);
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [fetchDashboard]);
 
   if (loading) return (
     <div style={{
@@ -114,10 +134,18 @@ export default function DoctorDashboard() {
   ];
 
   const quickActions = [
-    { icon: <BarChart2 size={15} />, label: "View Analytics", onClick: () => {} },
-    { icon: <MessageSquare size={15} />, label: "Messages", onClick: () => {} },
+    { icon: <BarChart2 size={15} />, label: "View Analytics", onClick: () => navigate("/doctor/bookings") },
+    { icon: <MessageSquare size={15} />, label: "Messages", onClick: () => navigate("/doctor/bookings") },
     { icon: <Settings size={15} />, label: "Settings", onClick: () => navigate("/doctor/settings") },
   ];
+
+  const completedStatuses = ["completed", "consultation-completed"];
+  const hiddenStatuses = ["completed", "consultation-completed", "cancelled", "rejected", "no-show"];
+  const nextBooking = (dashboard.recentBookings || []).find(
+    (booking) => !hiddenStatuses.includes((booking?.status || "").toLowerCase())
+  );
+  const firstBooking = dashboard.recentBookings?.[0];
+  const showCompleteState = firstBooking && completedStatuses.includes((firstBooking.status || "").toLowerCase());
 
   return (
     <div style={{
@@ -189,15 +217,25 @@ export default function DoctorDashboard() {
             <p style={{ margin: "0 0 6px", fontSize: "11px", color: "rgba(255,255,255,0.65)", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               Next Booking
             </p>
-            {dashboard.recentBookings?.[0] ? (
+            {nextBooking ? (
               <>
                 <p style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#fff" }}>
-                  {dashboard.recentBookings[0].patient}
+                  {nextBooking.patient}
                 </p>
                 <p style={{ margin: "4px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>
-                  {dashboard.recentBookings[0].date ? new Date(dashboard.recentBookings[0].date).toDateString() : ""}
+                  {nextBooking.date ? new Date(nextBooking.date).toDateString() : ""}
                 </p>
+                <p style={{ margin: "4px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>
+                  {nextBooking.time ? `Time: ${nextBooking.time}` : ""}
+                </p>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, padding: "4px 10px", borderRadius: 999, background: "rgba(255,255,255,0.18)", color: "#fff", fontSize: 11, fontWeight: 600, textTransform: "capitalize" }}>
+                  {nextBooking.status || "pending"}
+                </span>
               </>
+            ) : showCompleteState ? (
+              <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.75)", fontWeight: "600" }}>
+                Complete
+              </p>
             ) : (
               <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>No upcoming bookings</p>
             )}

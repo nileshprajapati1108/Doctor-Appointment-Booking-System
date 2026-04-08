@@ -50,6 +50,12 @@ export default function MedicalHistory() {
     }
   };
 
+  const formatDoctorName = (name) => {
+    if (!name) return "Doctor";
+    const trimmed = String(name).trim();
+    return trimmed.replace(/^dr\.?\s+/i, "");
+  };
+
   if (loading) return (
     <div
       style={{
@@ -170,7 +176,7 @@ export default function MedicalHistory() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
                       <div>
                         <p style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#1e3a5f" }}>
-                          Dr. {item.doctor?.user?.name || "Doctor"}
+                          Dr. {formatDoctorName(item.doctor?.user?.name)}
                         </p>
                         <p style={{ margin: "3px 0 0", fontSize: "13px", color: "#2563eb", fontWeight: "500" }}>
                           {item.doctor?.specialization || "Specialist"}

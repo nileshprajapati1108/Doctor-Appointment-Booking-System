@@ -27,15 +27,15 @@ const authSlice = createSlice({
   reducers: {
     loginSuccess: (state, action) => {
       // ✅ Backend returns: { _id, name, email, role, token }
-      const { _id, name, email, role, token, profileImage } = action.payload;
+      const { _id, name, email, role, token, profileImage, medicalHistory } = action.payload;
       
-      state.user = { _id, name, email, role, profileImage: profileImage || "" };
+      state.user = { _id, name, email, role, profileImage: profileImage || "", medicalHistory: medicalHistory || {} };
       state.token = token;
       state.isAuthenticated = true;
 
       // ✅ Store as single object
       localStorage.setItem("auth", JSON.stringify({
-        user: { _id, name, email, role, profileImage: profileImage || "" },
+        user: { _id, name, email, role, profileImage: profileImage || "", medicalHistory: medicalHistory || {} },
         token
       }));
     },

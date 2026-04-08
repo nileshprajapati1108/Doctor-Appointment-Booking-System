@@ -14,6 +14,7 @@ import {
 import { useSelector, useDispatch } from "react-redux";
 import { logout } from "../../Redux/authSlice";
 import API from "../util/api";
+import { useSiteName } from "../../utils/siteName";
 
 export default function PatientSidebar() {
   const location = useLocation();
@@ -22,6 +23,8 @@ export default function PatientSidebar() {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const dropdownRef = useRef(null);
+  const siteName = useSiteName();
+  const siteInitial = siteName.trim().charAt(0).toUpperCase() || "H";
 
   const { user } = useSelector((state) => state.auth);
 
@@ -92,7 +95,7 @@ export default function PatientSidebar() {
                   flexShrink: 0,
                 }}
               >
-                H
+                {siteInitial}
               </div>
 
               <button
@@ -136,7 +139,7 @@ export default function PatientSidebar() {
                     flexShrink: 0,
                   }}
                 >
-                  H
+                  {siteInitial}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <h1
@@ -150,7 +153,7 @@ export default function PatientSidebar() {
                       textOverflow: "ellipsis",
                     }}
                   >
-                    Happy Health
+                    {siteName}
                   </h1>
                   <p style={{ fontSize: "10px", color: "#64748b", margin: 0 }}>Patient Portal</p>
                 </div>

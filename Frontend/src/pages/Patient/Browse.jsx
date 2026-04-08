@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { Search, ChevronDown, Check, Stethoscope, Clock, IndianRupee, UserRound } from "lucide-react";
+import { Search, ChevronDown, Check, Stethoscope, Clock, IndianRupee, UserRound, Heart } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
@@ -92,6 +92,24 @@ export default function BrowseDoctors() {
   const doctorsToShow = filteredDoctors.slice(0, page * 6);
   const currentUser = getCurrentUser();
   const isLoggedIn = Boolean(currentUser);
+  const savedKey = currentUser?._id ? `savedDoctors:${currentUser._id}` : "savedDoctors:guest";
+
+  const readSavedDoctors = () => {
+    try {
+      const raw = localStorage.getItem(savedKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const [savedDoctors, setSavedDoctors] = useState(() => readSavedDoctors());
+  const savedIds = useMemo(() => new Set(savedDoctors.map((doc) => doc._id)), [savedDoctors]);
+
+  useEffect(() => {
+    setSavedDoctors(readSavedDoctors());
+  }, [savedKey]);
 
   const handleBookNow = (doctorId) => {
     if (!currentUser) {
@@ -104,6 +122,32 @@ export default function BrowseDoctors() {
       return;
     }
     navigate(`/patient/calendar/${doctorId}`);
+  };
+
+  const handleToggleSave = (doc) => {
+    if (!currentUser) {
+      dispatch(showToast({ message: "Please sign in as patient to save doctors", type: "warning" }));
+      navigate("/login");
+      return;
+    }
+    if (currentUser.role !== "patient") {
+      dispatch(showToast({ message: "Only patients can save doctors", type: "warning" }));
+      return;
+    }
+
+    const doctorData = {
+      _id: doc._id,
+      name: doc.user?.name || "Doctor",
+      specialty: doc.specialization || "Specialist",
+      image: doc.profileImage || doc.user?.profileImage || "",
+    };
+
+    setSavedDoctors((prev) => {
+      const exists = prev.some((item) => item._id === doctorData._id);
+      const updated = exists ? prev.filter((item) => item._id !== doctorData._id) : [doctorData, ...prev];
+      localStorage.setItem(savedKey, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   return (
@@ -429,6 +473,23 @@ export default function BrowseDoctors() {
 
                     {/* Action buttons */}
                     <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => handleToggleSave(doc)}
+                        title={savedIds.has(doc._id) ? "Unsave" : "Save"}
+                        style={{
+                          width: "38px", padding: "10px 0",
+                          borderRadius: "10px",
+                          border: savedIds.has(doc._id) ? "1px solid #fecaca" : "1px solid #dbeafe",
+                          background: savedIds.has(doc._id) ? "#fef2f2" : "#f8faff",
+                          color: savedIds.has(doc._id) ? "#ef4444" : "#2563eb",
+                          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = savedIds.has(doc._id) ? "#fee2e2" : "#eff6ff"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = savedIds.has(doc._id) ? "#fef2f2" : "#f8faff"; }}
+                      >
+                        <Heart size={14} fill={savedIds.has(doc._id) ? "#ef4444" : "none"} />
+                      </button>
                       <button
                         onClick={() =>
                           navigate(

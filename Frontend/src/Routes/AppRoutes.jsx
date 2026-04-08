@@ -31,7 +31,9 @@ import AdminLayout from "../Layouts/AdminLayout";
 import AdminDashboard from "../pages/Admin/Dashboard";
 import ManageDoctors from "../pages/Admin/ManageDoctors";
 import ManagePatients from "../pages/Admin/ManagePatients";
+import PatientProfileView from "../pages/Admin/PatientProfileView";
 import ManageAppointments from "../pages/Admin/ManageAppointments";
+import AppointmentDetails from "../pages/Admin/AppointmentDetails";
 import DoctorApproval from "../pages/Admin/DoctorApproval";
 import Reports from "../pages/Admin/Reports";
 import Settings from "../pages/Admin/Seting";
@@ -75,7 +77,9 @@ export default function AppRoutes() {
         <Route path="doctors" element={<ManageDoctors />} />
         <Route path="doctor-approval" element={<DoctorApproval />} />
         <Route path="patients" element={<ManagePatients />} />
+        <Route path="patients/:id" element={<PatientProfileView />} />
         <Route path="appointments" element={<ManageAppointments />} />
+        <Route path="appointments/:id" element={<AppointmentDetails />} />
         <Route path="report" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
       </Route>

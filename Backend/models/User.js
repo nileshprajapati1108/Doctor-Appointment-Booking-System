@@ -17,6 +17,13 @@ const userSchema = new mongoose.Schema({
   mustResetPassword: { type: Boolean, default: false }, // Force password reset on first login
   tempPassword: { type: String },                      // Temporary password (hashed)
   isFirstLogin: { type: Boolean, default: false },    // Track first login after approval (for profile setup)
+  medicalHistory: {
+    bloodGroup: { type: String, default: "" },
+    allergies: { type: String, default: "" },
+    chronicDiseases: { type: String, default: "" },
+    pastSurgeries: { type: String, default: "" },
+    currentMedications: { type: String, default: "" }
+  }
 }, { timestamps: true });
 
 userSchema.set("collection", "users");

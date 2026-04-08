@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { Search, Eye, CheckCircle2, XCircle, Trash2, Loader2, Calendar, Clock, X, User, Stethoscope } from "lucide-react";
 import API from "../util/api";
@@ -29,11 +30,13 @@ const statusStyle = (s) => {
 
 export default function ManageAppointments() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search,        setSearch]        = useState("");
   const [appointments,  setAppointments]  = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [actionLoading, setActionLoading] = useState({ id:null, type:null });
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [cancelDialog,  setCancelDialog]  = useState(null);
 
   useEffect(() => { fetchAppointments(); }, []);
 
@@ -42,7 +45,15 @@ export default function ManageAppointments() {
       setLoading(true);
       const res = await API.get("/appointments/all");
       const list = Array.isArray(res.data) ? res.data : [];
-      setAppointments(list.map(a => ({ id:a._id, doctor:a.doctor?.user?.name||"N/A", patient:a.patient?.name||"N/A", date:a.date||"N/A", time:a.time||"N/A", status:a.status||"pending" })));
+      setAppointments(list.map(a => ({
+        id: a._id,
+        doctor: a.doctor?.user?.name || "N/A",
+        doctorImage: a.doctor?.profileImage || a.doctor?.user?.profileImage || "",
+        patient: a.patient?.name || "N/A",
+        date: a.date || "N/A",
+        time: a.time || "N/A",
+        status: a.status || "pending"
+      })));
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -63,6 +74,26 @@ export default function ManageAppointments() {
     finally { setActionLoading({ id:null, type:null }); }
   };
 
+  const openCancelDialog = (appointment) => {
+    setCancelDialog({ id: appointment.id, label: `${appointment.doctor} – ${appointment.patient}`, reason: "" });
+  };
+
+  const handleCancelWithReason = async () => {
+    if (!cancelDialog?.id) return;
+    const reason = String(cancelDialog.reason || "").trim() || "Cancelled by admin";
+    try {
+      setActionLoading({ id: cancelDialog.id, type: "cancelled" });
+      await API.put(`/appointments/${cancelDialog.id}/admin-cancel`, { reason });
+      setAppointments(prev => prev.map(a => a.id===cancelDialog.id ? { ...a, status:"cancelled" } : a));
+      dispatch(showToast({ message:"Appointment cancelled", type:"success" }));
+    } catch {
+      dispatch(showToast({ message:"Failed to cancel appointment", type:"error" }));
+    } finally {
+      setActionLoading({ id:null, type:null });
+      setCancelDialog(null);
+    }
+  };
+
   const handleDelete = async (id) => {
     try {
       setActionLoading({ id, type:"delete" });
@@ -80,6 +111,21 @@ export default function ManageAppointments() {
     a.patient.toLowerCase().includes(search.toLowerCase()) ||
     a.date.includes(search) || a.time.includes(search)
   );
+
+  const canApprove = (status) => {
+    const s = (status || "").toLowerCase();
+    return s === "pending" || s === "arrived";
+  };
+
+  const canCancel = (status) => {
+    const s = (status || "").toLowerCase();
+    return !["cancelled", "rejected", "completed", "consultation-completed"].includes(s);
+  };
+
+  const canViewDetails = (status) => {
+    const s = (status || "").toLowerCase();
+    return ["consultation-completed", "completed"].includes(s);
+  };
 
   if (loading) return (
     <div style={{ minHeight:"60vh", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'DM Sans','Segoe UI',sans-serif" }}>
@@ -142,7 +188,13 @@ export default function ManageAppointments() {
                         onMouseEnter={e=>e.currentTarget.style.background="#f8faff"}
                         onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                         <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                          <div style={{ width:"30px", height:"30px", borderRadius:"50%", background:"linear-gradient(135deg,#2563eb,#38bdf8)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:"700", fontSize:"12px", flexShrink:0 }}>{a.doctor.charAt(0)}</div>
+                          <div style={{ width:"30px", height:"30px", borderRadius:"50%", background:"linear-gradient(135deg,#2563eb,#38bdf8)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:"700", fontSize:"12px", flexShrink:0, overflow:"hidden" }}>
+                            {a.doctorImage ? (
+                              <img src={a.doctorImage} alt={a.doctor} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            ) : (
+                              (a.doctor || "D").charAt(0)
+                            )}
+                          </div>
                           <span style={{ fontSize:"13px", fontWeight:"600", color:"#1e3a5f", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.doctor}</span>
                         </div>
                         <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
@@ -161,12 +213,13 @@ export default function ManageAppointments() {
                           <span style={{ padding:"3px 10px", borderRadius:"20px", fontSize:"11px", fontWeight:"700", color:sc.color, background:sc.bg, border:`1px solid ${sc.border}`, textTransform:"capitalize" }}>{a.status}</span>
                         </div>
                         <div style={{ display:"flex", gap:"6px", justifyContent:"center" }}>
-                          <button title="View" style={{ width:"28px", height:"28px", borderRadius:"8px", border:"1px solid #dbeafe", background:"#f8faff", color:"#2563eb", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}
-                            onMouseEnter={e=>{e.currentTarget.style.background="#eff6ff";e.currentTarget.style.borderColor="#93c5fd";}}
-                            onMouseLeave={e=>{e.currentTarget.style.background="#f8faff";e.currentTarget.style.borderColor="#dbeafe";}}>
+                          <button title="View" style={{ width:"28px", height:"28px", borderRadius:"8px", border:"1px solid #dbeafe", background: canViewDetails(a.status) ? "#f8faff" : "#f1f5f9", color: canViewDetails(a.status) ? "#2563eb" : "#94a3b8", cursor: canViewDetails(a.status) ? "pointer" : "not-allowed", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}
+                            onClick={() => { if (canViewDetails(a.status)) navigate(`/admin/appointments/${a.id}`); }}
+                            onMouseEnter={e=>{ if (canViewDetails(a.status)) { e.currentTarget.style.background="#eff6ff";e.currentTarget.style.borderColor="#93c5fd"; } }}
+                            onMouseLeave={e=>{ if (canViewDetails(a.status)) { e.currentTarget.style.background="#f8faff";e.currentTarget.style.borderColor="#dbeafe"; } }}>
                             <Eye size={13}/>
                           </button>
-                          {a.status!=="approved" && a.status!=="confirmed" && (
+                          {canApprove(a.status) && (
                             <button onClick={()=>handleUpdateStatus(a.id,"approved")} disabled={isLoadingApprove} title="Approve"
                               style={{ width:"28px", height:"28px", borderRadius:"8px", border:"1px solid #a7f3d0", background:"#ecfdf5", color:"#059669", cursor:isLoadingApprove?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s", opacity:isLoadingApprove?.6:1 }}
                               onMouseEnter={e=>{if(!isLoadingApprove)e.currentTarget.style.background="#d1fae5";}}
@@ -174,8 +227,8 @@ export default function ManageAppointments() {
                               {isLoadingApprove ? <Loader2 size={12} style={{animation:"spin .8s linear infinite"}}/> : <CheckCircle2 size={13}/>}
                             </button>
                           )}
-                          {a.status!=="cancelled" && (
-                            <button onClick={()=>handleUpdateStatus(a.id,"cancelled")} disabled={isLoadingCancel} title="Cancel"
+                          {canCancel(a.status) && (
+                            <button onClick={()=>openCancelDialog(a)} disabled={isLoadingCancel} title="Cancel"
                               style={{ width:"28px", height:"28px", borderRadius:"8px", border:"1px solid #fecaca", background:"#fef2f2", color:"#ef4444", cursor:isLoadingCancel?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s", opacity:isLoadingCancel?.6:1 }}
                               onMouseEnter={e=>{if(!isLoadingCancel)e.currentTarget.style.background="#fee2e2";}}
                               onMouseLeave={e=>{if(!isLoadingCancel)e.currentTarget.style.background="#fef2f2";}}>
@@ -225,6 +278,34 @@ export default function ManageAppointments() {
               <button onClick={()=>setDeleteConfirm(null)} style={{ flex:1, padding:"12px", borderRadius:"12px", border:"1px solid #dbeafe", background:"#f8faff", color:"#64748b", fontWeight:"600", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}
                 onMouseEnter={e=>e.currentTarget.style.background="#eff6ff"} onMouseLeave={e=>e.currentTarget.style.background="#f8faff"}>Cancel</button>
               <button onClick={()=>handleDelete(deleteConfirm.id)} style={{ flex:1, padding:"12px", borderRadius:"12px", border:"none", background:"linear-gradient(135deg,#ef4444,#f87171)", color:"#fff", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit", boxShadow:"0 4px 14px rgba(239,68,68,.28)" }}>Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelDialog && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,.5)", backdropFilter:"blur(6px)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
+          <div style={{ width:"100%", maxWidth:"420px", background:"#fff", borderRadius:"24px", padding:"28px", boxShadow:"0 24px 64px rgba(0,0,0,.2)", border:"1px solid #dbeafe", animation:"fadeIn .28s ease" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"10px" }}>
+              <div style={{ width:"42px", height:"42px", borderRadius:"12px", background:"#fef2f2", border:"1px solid #fecaca", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <XCircle size={18} style={{ color:"#ef4444" }} />
+              </div>
+              <div>
+                <h2 style={{ margin:"0 0 4px", fontSize:"17px", fontWeight:"800", color:"#1e3a5f" }}>Cancel Appointment</h2>
+                <p style={{ margin:0, fontSize:"12px", color:"#64748b" }}>{cancelDialog.label}</p>
+              </div>
+            </div>
+            <p style={{ margin:"8px 0 10px", fontSize:"12px", color:"#64748b" }}>Reason is sent to the patient via email.</p>
+            <textarea
+              rows={3}
+              value={cancelDialog.reason}
+              onChange={(e) => setCancelDialog((prev) => ({ ...prev, reason: e.target.value }))}
+              placeholder="Write a short reason (optional)"
+              style={{ width:"100%", padding:"10px 12px", borderRadius:"10px", border:"1px solid #dbeafe", background:"#f8faff", fontSize:"13px", color:"#1e3a5f", resize:"vertical", outline:"none", fontFamily:"inherit" }}
+            />
+            <div style={{ display:"flex", gap:"10px", marginTop:"16px" }}>
+              <button onClick={() => setCancelDialog(null)} style={{ flex:1, padding:"11px", borderRadius:"12px", border:"1px solid #dbeafe", background:"#f8faff", color:"#64748b", fontWeight:"600", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Back</button>
+              <button onClick={handleCancelWithReason} style={{ flex:1, padding:"11px", borderRadius:"12px", border:"none", background:"linear-gradient(135deg,#ef4444,#f87171)", color:"#fff", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit", boxShadow:"0 4px 14px rgba(239,68,68,.28)" }}>Cancel Appointment</button>
             </div>
           </div>
         </div>

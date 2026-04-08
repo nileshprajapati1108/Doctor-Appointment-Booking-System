@@ -80,7 +80,7 @@ const doctorSchema = new mongoose.Schema({
     ref: "User",
     default: null,
   },
-  createdAt: {
+  createdAt: {  
     type: Date,
     default: Date.now,
   },

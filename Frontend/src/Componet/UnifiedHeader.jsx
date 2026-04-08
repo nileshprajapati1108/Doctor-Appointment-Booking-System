@@ -20,6 +20,8 @@ export default function UnifiedHeader() {
   const [isClearing, setIsClearing] = useState(false);
 
   const { user } = useSelector((state) => state.auth);
+  const doctorProfile = useSelector((state) => state.doctor?.profile);
+  const avatarUrl = user?.profileImage || (user?.role === "doctor" ? doctorProfile?.profileImage : "");
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -171,9 +173,9 @@ export default function UnifiedHeader() {
 
         {/* Profile Avatar */}
         <div className="flex items-center gap-3 pl-4 border-l border-blue-100">
-          {user?.profileImage ? (
+          {avatarUrl ? (
             <img
-              src={user.profileImage}
+              src={avatarUrl}
               alt="Profile"
               className="w-9 h-9 rounded-full border border-blue-100 shadow-md object-cover"
             />

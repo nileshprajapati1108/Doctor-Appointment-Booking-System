@@ -19,8 +19,8 @@ export default function DoctorAvatar({
 
   const initials = getInitials(name).toUpperCase();
 
-  // CHECK IMAGE
-  const hasImage = doctor?.image;
+  const imageUrl = doctor?.profileImage || doctor?.user?.profileImage || doctor?.image || "";
+  const hasImage = Boolean(imageUrl);
 
   return (
     <div
@@ -28,7 +28,7 @@ export default function DoctorAvatar({
     >
       {hasImage ? (
         <img
-          src={doctor.image}
+          src={imageUrl}
           alt={name}
           className="w-full h-full object-cover rounded-full"
         />

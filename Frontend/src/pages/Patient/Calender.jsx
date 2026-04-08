@@ -68,6 +68,7 @@ export default function BookingPage() {
       });
       setAvailableSlots(data.slots || []);
     } catch (err) {
+      console.log("Error loading available slots", err);
       dispatch(showToast({ message: "Could not load slots", type: "error" }));
     }
   };
@@ -76,17 +77,15 @@ export default function BookingPage() {
     if (loading) return;
     setLoading(true);
     try {
-      const payload = {
-        doctorId: doctor._id,
-        date: selectedDate,
-        time: convert12To24(selectedTime),
-      };
-      if (selectedSlotId) payload.slotId = selectedSlotId;
-      await api.post("/appointments/book", payload);
+      // Backend expects a composite slotId token: "doctorId|date|startTime"
+      const slotToken = selectedSlotId || `${doctor._id}|${selectedDate}|${convert12To24(selectedTime)}`;
+
+      await api.post("/appointments/book", { slotId: slotToken });
       dispatch(showToast({ message: "Appointment booked successfully!", type: "success" }));
       navigate("/patient/appointments");
     } catch (err) {
-      dispatch(showToast({ message: "Failed to book appointment.", type: "error" }));
+      const serverMessage = err?.response?.data?.message || err?.response?.data?.error;
+      dispatch(showToast({ message: serverMessage || "Failed to book appointment.", type: "error" }));
     } finally {
       setLoading(false);
     }
@@ -108,6 +107,8 @@ export default function BookingPage() {
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const offset = (firstDay + 6) % 7;
   const dayCells = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  const doctorImage = doctor?.profileImage || doctor?.user?.profileImage || "";
+  const doctorInitial = doctor?.user?.name?.charAt(0) || "D";
 
   return (
     <div
@@ -202,9 +203,14 @@ export default function BookingPage() {
                 color: "#fff", fontWeight: "800", fontSize: "20px",
                 marginBottom: "12px",
                 boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
+                overflow: "hidden",
               }}
             >
-              {doctor.user?.name?.charAt(0) || "D"}
+              {doctorImage ? (
+                <img src={doctorImage} alt={doctor.user?.name || "Doctor"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                doctorInitial
+              )}
             </div>
             <p style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "#1e3a5f" }}>
               {doctor.user?.name}
@@ -555,9 +561,14 @@ export default function BookingPage() {
                         color: "#fff", fontWeight: "800", fontSize: "18px",
                         boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
                         flexShrink: 0,
+                        overflow: "hidden",
                       }}
                     >
-                      {doctor.user?.name?.charAt(0) || "D"}
+                      {doctorImage ? (
+                        <img src={doctorImage} alt={doctor.user?.name || "Doctor"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        doctorInitial
+                      )}
                     </div>
                     <div>
                       <p style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#1e3a5f" }}>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { Search, Eye, Trash2, Loader2, Stethoscope, Mail, X, CheckCircle2 } from "lucide-react";
 import API from "../util/api";
 import { showToast } from "../../Redux/toastSlice";
@@ -14,7 +15,7 @@ function useLazyReveal(threshold = 0.08) {
       ([e]) => { if (e.isIntersecting) { setVisible(true); io.disconnect(); } }, { threshold }
     );
     io.observe(el); return () => io.disconnect();
-  }, []);
+  }, [threshold]);
   return [ref, visible];
 }
 function Reveal({ children, delay = 0, style = {} }) {
@@ -28,6 +29,7 @@ function Reveal({ children, delay = 0, style = {} }) {
 
 export default function ManageDoctors() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search,        setSearch]        = useState("");
   const [doctors,       setDoctors]       = useState([]);
   const [loading,       setLoading]       = useState(true);
@@ -47,6 +49,7 @@ export default function ManageDoctors() {
         specialty:doc.specialization|| "N/A",
         email:    doc.user?.email   || "N/A",
         status:   doc.status        || "Approved",
+        image:    doc.profileImage || doc.user?.profileImage || "",
       })));
     } catch (err) {
       console.error("Failed to fetch doctors:", err);
@@ -62,6 +65,7 @@ export default function ManageDoctors() {
       setDoctors(prev => prev.filter(d => d.id !== id));
       dispatch(showToast({ message:"Doctor deleted successfully", type:"success" }));
     } catch (err) {
+      console.log(err);
       dispatch(showToast({ message:"Failed to delete doctor", type:"error" }));
     } finally {
       setActionLoading({ id:null, type:null });
@@ -161,8 +165,12 @@ export default function ManageDoctors() {
                       >
                         {/* Name */}
                         <div style={{ display:"flex", alignItems:"center", gap:"10px", minWidth:0 }}>
-                          <div style={{ width:"36px", height:"36px", borderRadius:"50%", background:"linear-gradient(135deg,#2563eb,#38bdf8)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:"700", fontSize:"14px", flexShrink:0 }}>
-                            {doc.name.charAt(0).toUpperCase()}
+                          <div style={{ width:"36px", height:"36px", borderRadius:"50%", background:"linear-gradient(135deg,#2563eb,#38bdf8)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:"700", fontSize:"14px", flexShrink:0, overflow:"hidden" }}>
+                            {doc.image ? (
+                              <img src={doc.image} alt={doc.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            ) : (
+                              doc.name.charAt(0).toUpperCase()
+                            )}
                           </div>
                           <span style={{ fontSize:"14px", fontWeight:"600", color:"#1e3a5f", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{doc.name}</span>
                         </div>
@@ -189,6 +197,7 @@ export default function ManageDoctors() {
                         {/* Actions */}
                         <div style={{ display:"flex", gap:"8px", justifyContent:"center" }}>
                           <button title="View" style={{ width:"32px", height:"32px", borderRadius:"8px", border:"1px solid #dbeafe", background:"#f8faff", color:"#2563eb", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}
+                            onClick={() => navigate(`/doctor/${doc.id}`, { state: { fromAdmin: true, backTo: "/admin/doctors" } })}
                             onMouseEnter={e=>{ e.currentTarget.style.background="#eff6ff"; e.currentTarget.style.borderColor="#93c5fd"; }}
                             onMouseLeave={e=>{ e.currentTarget.style.background="#f8faff"; e.currentTarget.style.borderColor="#dbeafe"; }}>
                             <Eye size={14}/>

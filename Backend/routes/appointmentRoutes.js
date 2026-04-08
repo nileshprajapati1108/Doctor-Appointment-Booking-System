@@ -24,7 +24,8 @@ import {
   getPatientReminders,
   adminUpdateAppointmentStatus,
   adminCancelAppointment,
-  adminDeleteAppointment
+  adminDeleteAppointment,
+  getAppointmentByIdAdmin
 } from "../controllers/appointmentController.js";
 
 import { protect, patientOnly, doctorOnly, adminOnly } from "../middleware/authMiddleware.js";
@@ -64,6 +65,7 @@ router.get("/all", protect, adminOnly, getAllAppointments);
 router.put("/:id/admin-status", protect, adminOnly, adminUpdateAppointmentStatus);
 router.put("/:id/admin-cancel", protect, adminOnly, adminCancelAppointment);
 router.delete("/:id/admin-delete", protect, adminOnly, adminDeleteAppointment);
+router.get("/:id/admin-detail", protect, adminOnly, getAppointmentByIdAdmin);
 
 // Get single appointment (must be last to avoid conflicts)
 router.get("/:id", protect, patientOnly, getAppointmentById);

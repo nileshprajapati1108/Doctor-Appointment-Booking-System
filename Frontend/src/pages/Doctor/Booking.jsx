@@ -309,6 +309,9 @@ export default function DoctorBookings() {
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState({ id: null, type: null });
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, appointmentId: null, action: null, endpoint: null });
+  const [messageModal, setMessageModal] = useState({ open: false, appointment: null, subject: "", body: "" });
+  const [messageSending, setMessageSending] = useState(false);
+  const [cancelDialog, setCancelDialog] = useState({ open: false, appointment: null, reason: "" });
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -363,6 +366,57 @@ export default function DoctorBookings() {
     }
   };
 
+  const openMessage = (appointment) => {
+    setMessageModal({
+      open: true,
+      appointment,
+      subject: "Appointment Update",
+      body: "",
+    });
+  };
+
+  const sendMessage = async () => {
+    if (!messageModal.appointment?._id) return;
+    if (!messageModal.body.trim()) {
+      dispatch(showToast({ message: "Please enter a message", type: "warning" }));
+      return;
+    }
+    try {
+      setMessageSending(true);
+      await API.post("/doctors/messages", {
+        appointmentId: messageModal.appointment._id,
+        subject: messageModal.subject,
+        message: messageModal.body,
+      });
+      dispatch(showToast({ message: "Message sent to patient", type: "success" }));
+      setMessageModal({ open: false, appointment: null, subject: "", body: "" });
+    } catch (error) {
+      dispatch(showToast({ message: error.response?.data?.message || "Failed to send message", type: "error" }));
+    } finally {
+      setMessageSending(false);
+    }
+  };
+
+  const openCancel = (appointment) => {
+    setCancelDialog({ open: true, appointment, reason: "" });
+  };
+
+  const submitCancel = async () => {
+    if (!cancelDialog.appointment?._id) return;
+    const reason = String(cancelDialog.reason || "").trim() || "Cancelled by doctor";
+    try {
+      setActionLoading({ id: cancelDialog.appointment._id, type: "Cancel" });
+      await API.put(`/appointments/${cancelDialog.appointment._id}`, { status: "cancelled", reason });
+      dispatch(showToast({ message: "Appointment cancelled", type: "success" }));
+      await fetchBookings();
+    } catch (error) {
+      dispatch(showToast({ message: error.response?.data?.message || "Cancellation failed", type: "error" }));
+    } finally {
+      setActionLoading({ id: null, type: null });
+      setCancelDialog({ open: false, appointment: null, reason: "" });
+    }
+  };
+
   const askAction = (appointmentId, action, endpoint) => {
     setConfirmDialog({ isOpen: true, appointmentId, action, endpoint });
   };
@@ -390,6 +444,9 @@ export default function DoctorBookings() {
       await API.post(`/appointments/${selected._id}/notes`, doctorNotes);
       dispatch(showToast({ message: "Clinical data saved", type: "success" }));
       await fetchBookings();
+      setSelected(null);
+      setPrescription({ diagnosis: "", medicines: [emptyMedicine()], advice: "", followUpDate: "" });
+      setDoctorNotes(emptyNotes);
     } catch (error) {
       dispatch(showToast({ message: error.response?.data?.message || "Failed to save clinical data", type: "error" }));
     } finally {
@@ -402,6 +459,20 @@ export default function DoctorBookings() {
   const updateMedicine = (index, key, value) => {
     setPrescription((prev) => ({ ...prev, medicines: prev.medicines.map((item, idx) => (idx === index ? { ...item, [key]: value } : item)) }));
   };
+
+  const formatDateLabel = (dateValue) => {
+    if (!dateValue) return "";
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return String(dateValue);
+    return parsed.toLocaleDateString("en-US", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+  };
+
+  const canCancel = (status) => ["pending", "approved", "arrived"].includes((status || "").toLowerCase());
 
   return (
     <>
@@ -443,7 +514,7 @@ export default function DoctorBookings() {
             <section key={dateKey} style={{ marginBottom: 28 }}>
               <div className="date-header">
                 <Calendar size={15} />
-                {new Date(dateKey).toDateString()}
+                {formatDateLabel(dateKey)}
                 <span style={{ background: "var(--azure-pale)", color: "var(--azure)", borderRadius: 999, padding: "1px 8px", fontSize: 12 }}>
                   {grouped[dateKey].length} appt{grouped[dateKey].length !== 1 ? "s" : ""}
                 </span>
@@ -492,6 +563,9 @@ export default function DoctorBookings() {
 
                     {/* Action buttons */}
                     <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+                      <button className="btn btn-ghost" onClick={() => openMessage(item)}>
+                        <MessageSquare size={14} /> Message
+                      </button>
                       {item.status === "pending" && (
                         <>
                           <button className="btn btn-primary" onClick={() => askAction(item._id, "Approve", `/appointments/${item._id}`)} disabled={actionLoading.id === item._id}>
@@ -516,6 +590,11 @@ export default function DoctorBookings() {
                       {item.status === "approved" && (
                         <button className="btn btn-warn" onClick={() => askAction(item._id, "Mark No-show", `/appointments/${item._id}`)} disabled={actionLoading.id === item._id}>
                           <AlertTriangle size={14} /> No-show
+                        </button>
+                      )}
+                      {canCancel(item.status) && (
+                        <button className="btn btn-danger" onClick={() => openCancel(item)} disabled={actionLoading.id === item._id}>
+                          <XCircle size={14} /> Cancel
                         </button>
                       )}
                       {item.status === "consultation-completed" && (
@@ -653,6 +732,105 @@ export default function DoctorBookings() {
                 <button className="btn btn-primary" disabled={saving} onClick={saveClinicalData}>
                   {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <FileText size={14} />}
                   Save Clinical Data
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Message Modal ── */}
+        {messageModal.open && messageModal.appointment && (
+          <div className="modal-overlay">
+            <div className="modal" style={{ maxWidth: 720 }}>
+              <div className="modal-header">
+                <h2><MessageSquare size={20} /> Message Patient</h2>
+                <button className="modal-close" onClick={() => setMessageModal({ open: false, appointment: null, subject: "", body: "" })}>
+                  <XCircle size={18} />
+                </button>
+              </div>
+
+              <div style={{ padding: "14px 24px", background: "var(--azure-pale)", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--azure)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <User size={17} color="#fff" />
+                </div>
+                <div>
+                  <p style={{ fontWeight: 600, color: "var(--slate)", fontSize: 16, margin: 0 }}>{messageModal.appointment.patient?.name}</p>
+                  <p style={{ color: "var(--mist)", fontSize: 13.5, margin: 0 }}>{messageModal.appointment.patient?.email}</p>
+                </div>
+              </div>
+
+              <div className="modal-body">
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <Field label="Subject">
+                    <input
+                      className="field"
+                      value={messageModal.subject}
+                      onChange={(e) => setMessageModal((prev) => ({ ...prev, subject: e.target.value }))}
+                      placeholder="Appointment update"
+                    />
+                  </Field>
+                  <Field label="Message">
+                    <textarea
+                      className="field"
+                      rows={5}
+                      value={messageModal.body}
+                      onChange={(e) => setMessageModal((prev) => ({ ...prev, body: e.target.value }))}
+                      placeholder="Write a short message for the patient…"
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn btn-ghost" onClick={() => setMessageModal({ open: false, appointment: null, subject: "", body: "" })}>Cancel</button>
+                <button className="btn btn-primary" disabled={messageSending} onClick={sendMessage}>
+                  {messageSending ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <MessageSquare size={14} />}
+                  Send Message
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {cancelDialog.open && cancelDialog.appointment && (
+          <div className="modal-overlay">
+            <div className="modal" style={{ maxWidth: 560 }}>
+              <div className="modal-header">
+                <h2><XCircle size={20} /> Cancel Appointment</h2>
+                <button className="modal-close" onClick={() => setCancelDialog({ open: false, appointment: null, reason: "" })}>
+                  <XCircle size={18} />
+                </button>
+              </div>
+
+              <div style={{ padding: "14px 24px", background: "var(--azure-pale)", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--azure)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <User size={17} color="#fff" />
+                </div>
+                <div>
+                  <p style={{ fontWeight: 600, color: "var(--slate)", fontSize: 16, margin: 0 }}>{cancelDialog.appointment.patient?.name}</p>
+                  <p style={{ color: "var(--mist)", fontSize: 13.5, margin: 0 }}>{cancelDialog.appointment.patient?.email}</p>
+                </div>
+              </div>
+
+              <div className="modal-body">
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <Field label="Reason (sent to patient email)">
+                    <textarea
+                      className="field"
+                      rows={4}
+                      value={cancelDialog.reason}
+                      onChange={(e) => setCancelDialog((prev) => ({ ...prev, reason: e.target.value }))}
+                      placeholder="Write a short reason (optional)"
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn btn-ghost" onClick={() => setCancelDialog({ open: false, appointment: null, reason: "" })}>Back</button>
+                <button className="btn btn-danger" disabled={actionLoading.id === cancelDialog.appointment._id} onClick={submitCancel}>
+                  {actionLoading.id === cancelDialog.appointment._id && actionLoading.type === "Cancel" ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <XCircle size={14} />}
+                  Cancel Appointment
                 </button>
               </div>
             </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import axios from "axios";
-import { ArrowLeft, Calendar, Clock, MapPin, Award, Star, ChevronDown } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, MapPin, Award, Star, ChevronDown, Stethoscope, User } from "lucide-react";
 import Loader from "../Componet/Loader";
 import DoctorAvatar from "../Componet/DoctorAvatar";
 import PublicHeader from "../Componet/PublicHeader";
@@ -149,6 +149,10 @@ const STYLES = `
     font-size: 13px;
     font-weight: 600;
     transition: transform 0.18s;
+    line-height: 1.2;
+    word-break: break-word;
+    hyphens: auto;
+    overflow: hidden;
   }
   .dp-avail-pill:hover { transform: translateY(-2px); }
   .dp-avail-pill.active  { background: #f0fdf4; border: 2px solid #22c55e; color: #15803d; }
@@ -169,8 +173,7 @@ const STYLES = `
     border-radius: 18px;
     padding: 28px;
     box-shadow: 0 8px 40px rgba(15,32,68,0.12), 0 0 0 1px rgba(15,32,68,0.05);
-    position: sticky;
-    top: 90px;
+    position: relative;
   }
   .dp-book-btn {
     width: 100%;
@@ -323,10 +326,14 @@ export default function DoctorProfilePage() {
   const [reviewsData, setReviewsData] = useState({ averageRating: 0, totalReviews: 0, reviews: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   const user = getCurrentUser();
   const token = getStoredAuth()?.token;
   const isPatientLayoutView = user?.role === "patient" && location.pathname.startsWith("/patient/");
+  const isAdminPreview = Boolean(location.state?.fromAdmin);
+  const showBackHeader = isPatientLayoutView || Boolean(location.state?.backTo);
+  const showPublicShell = !showBackHeader && !isAdminPreview;
 
   useEffect(() => {
     const fetchDoctor = async () => {
@@ -358,6 +365,14 @@ export default function DoctorProfilePage() {
     navigate(`/patient/calendar/${id}`);
   };
 
+  const handleBack = () => {
+    if (location.state?.backTo) {
+      navigate(location.state.backTo);
+      return;
+    }
+    navigate(-1);
+  };
+
   /* ── Inject styles once ── */
   useEffect(() => {
     const id = "dp-styles";
@@ -369,13 +384,27 @@ export default function DoctorProfilePage() {
     }
   }, []);
 
+  const backHeader = (isAdminPreview || showBackHeader) ? (
+    <div style={{ position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(10px)", background: "rgba(248,250,252,0.9)", borderBottom: "1px solid var(--gray-200)" }}>
+      <div style={{ maxWidth: 920, margin: "0 auto", padding: "12px 24px" }}>
+        <button
+          onClick={handleBack}
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid var(--gray-200)", background: "white", color: "var(--gray-700)", borderRadius: 10, padding: "8px 12px", cursor: "pointer", fontWeight: 600 }}>
+          <ArrowLeft size={16} />
+          Back
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   /* ── Loading ── */
   if (loading) {
     return (
       <div className="dp-root" style={{ minHeight: "100vh", background: "var(--gray-50)" }}>
-        {!isPatientLayoutView && <PublicHeader sticky />}
+        {showPublicShell && <PublicHeader sticky />}
+        {backHeader}
         <ProfileSkeleton />
-        {!isPatientLayoutView && <PublicFooter />}
+        {showPublicShell && <PublicFooter />}
       </div>
     );
   }
@@ -384,7 +413,8 @@ export default function DoctorProfilePage() {
   if (error || !doctor) {
     return (
       <div className="dp-root" style={{ minHeight: "100vh", background: "var(--white)" }}>
-        {!isPatientLayoutView && <PublicHeader sticky />}
+        {showPublicShell && <PublicHeader sticky />}
+        {backHeader}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: isPatientLayoutView ? "100vh" : "70vh", padding: "0 24px" }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ width: 72, height: 72, background: "var(--blue-50)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
@@ -401,16 +431,20 @@ export default function DoctorProfilePage() {
             </Link>
           </div>
         </div>
-        {!isPatientLayoutView && <PublicFooter />}
+        {showPublicShell && <PublicFooter />}
       </div>
     );
   }
 
   const ratingPct = (reviewsData.averageRating / 5) * 100;
+  const experienceYears = doctor.yearsOfExperience ?? doctor.experience ?? 0;
+  const doctorAge = doctor.user?.age;
 
   return (
     <div className="dp-root" style={{ minHeight: "100vh", background: "var(--gray-50)" }}>
-      {!isPatientLayoutView && <PublicHeader sticky />}
+      {showPublicShell && <PublicHeader sticky />}
+
+      {backHeader}
 
       <div style={{ maxWidth: 920, margin: "0 auto", padding: "44px 24px 60px" }}>
 
@@ -423,9 +457,6 @@ export default function DoctorProfilePage() {
               </div>
             </div>
             <div style={{ flex: 1 }}>
-              <p className="dp-spec-pill" style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.25)", marginBottom: 10 }}>
-                {doctor.specialization}
-              </p>
               <h1 style={{ fontFamily: "'Sora',sans-serif", fontSize: "clamp(26px,4vw,38px)", fontWeight: 800, margin: "0 0 6px", letterSpacing: "-0.5px" }}>
                 {doctor.user?.name || "Doctor"}
               </h1>
@@ -436,8 +467,10 @@ export default function DoctorProfilePage() {
                 </span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                <span className="dp-badge"><Award size={16} />{doctor.experience || 0} Yrs Experience</span>
+                {doctor.specialization && <span className="dp-badge"><Stethoscope size={16} />{doctor.specialization}</span>}
+                <span className="dp-badge"><Award size={16} />{experienceYears} Yrs Experience</span>
                 <span className="dp-badge"><Star size={16} style={{ fill: "#fbbf24", color: "#fbbf24" }} />{reviewsData.averageRating.toFixed(1)} Rating</span>
+                {doctorAge ? <span className="dp-badge"><User size={16} />{doctorAge} Yrs</span> : null}
                 {doctor.location && <span className="dp-badge"><MapPin size={16} />{doctor.location}</span>}
               </div>
             </div>
@@ -459,15 +492,6 @@ export default function DoctorProfilePage() {
               </div>
             </div>
 
-            {/* About */}
-            {doctor.about && (
-              <div className="dp-card fade-up fade-up-2">
-                <Collapsible title="About" icon={<span style={{ fontSize: 18 }}>👤</span>}>
-                  <p style={{ color: "var(--gray-700)", lineHeight: 1.75, fontSize: 15, margin: 0 }}>{doctor.about}</p>
-                </Collapsible>
-              </div>
-            )}
-
             {/* Qualifications */}
             <div className="dp-card fade-up fade-up-3">
               <Collapsible title="Qualifications" icon={<Award size={20} style={{ color: "var(--blue-500)" }} />}>
@@ -482,13 +506,12 @@ export default function DoctorProfilePage() {
                   </div>
                   <div className="dp-qual-item">
                     <span className="dp-qual-dot" />
-                    <span style={{ color: "var(--gray-700)", fontSize: 15 }}>{doctor.experience}+ years of clinical experience</span>
+                    <span style={{ color: "var(--gray-700)", fontSize: 15 }}>{experienceYears}+ years of clinical experience</span>
                   </div>
                 </div>
               </Collapsible>
             </div>
 
-            {/* Availability */}
             {doctor.availability && (
               <div className="dp-card fade-up fade-up-4">
                 <Collapsible title="Availability" icon={<Calendar size={20} style={{ color: "#22c55e" }} />}>
@@ -509,65 +532,52 @@ export default function DoctorProfilePage() {
               </div>
             )}
 
-            {/* Reviews */}
-            <div className="dp-card fade-up fade-up-5">
-              <Collapsible
-                title={`Reviews (${reviewsData.totalReviews})`}
-                icon={<Star size={20} style={{ color: "#f59e0b", fill: "#f59e0b" }} />}
-              >
-                {/* Rating summary bar */}
-                {reviewsData.totalReviews > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 0 24px", borderBottom: "1px solid var(--gray-100)", marginBottom: 20 }}>
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 48, fontWeight: 800, color: "var(--blue-700)", lineHeight: 1 }}>
-                        {reviewsData.averageRating.toFixed(1)}
+            {(doctor.hospitalClinicName || doctor.hospitalClinicAddress || doctor.medicalQualification || doctor.medicalRegistrationId) && (
+              <div className="dp-card fade-up fade-up-4">
+                <Collapsible title="Clinic Details" icon={<MapPin size={20} style={{ color: "var(--blue-500)" }} />}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {doctor.hospitalClinicName && (
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <span style={{ color: "var(--gray-500)", fontSize: 13 }}>Clinic</span>
+                        <span style={{ color: "var(--gray-700)", fontSize: 14, fontWeight: 600, textAlign: "right" }}>
+                          {doctor.hospitalClinicName}
+                        </span>
                       </div>
-                      <Stars rating={reviewsData.averageRating} />
-                      <p style={{ fontSize: 12, color: "var(--gray-400)", margin: "6px 0 0" }}>{reviewsData.totalReviews} reviews</p>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div className="dp-rating-bar-bg" style={{ marginBottom: 8 }}>
-                        <div className="dp-rating-bar-fill" style={{ width: `${ratingPct}%` }} />
+                    )}
+                    {doctor.hospitalClinicAddress && (
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <span style={{ color: "var(--gray-500)", fontSize: 13 }}>Address</span>
+                        <span style={{ color: "var(--gray-700)", fontSize: 14, fontWeight: 600, textAlign: "right" }}>
+                          {doctor.hospitalClinicAddress}
+                        </span>
                       </div>
-                      <p style={{ margin: 0, fontSize: 12, color: "var(--gray-500)" }}>Overall satisfaction</p>
-                    </div>
+                    )}
+                    {doctor.medicalQualification && (
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <span style={{ color: "var(--gray-500)", fontSize: 13 }}>Qualification</span>
+                        <span style={{ color: "var(--gray-700)", fontSize: 14, fontWeight: 600, textAlign: "right" }}>
+                          {doctor.medicalQualification}
+                        </span>
+                      </div>
+                    )}
+                    {doctor.medicalRegistrationId && (
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <span style={{ color: "var(--gray-500)", fontSize: 13 }}>Reg. ID</span>
+                        <span style={{ color: "var(--gray-700)", fontSize: 14, fontWeight: 600, textAlign: "right" }}>
+                          {doctor.medicalRegistrationId}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
+                </Collapsible>
+              </div>
+            )}
 
-                {reviewsData.reviews.length === 0 ? (
-                  <p style={{ color: "var(--gray-400)", fontSize: 14, textAlign: "center", padding: "24px 0" }}>No reviews yet</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    {reviewsData.reviews.map((item) => (
-                      <div key={item._id} className="dp-review">
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                          <div>
-                            <p style={{ fontWeight: 700, fontSize: 14, color: "var(--gray-900)", margin: "0 0 4px" }}>{item.patientName}</p>
-                            <Stars rating={item.rating} />
-                          </div>
-                          <div style={{ textAlign: "right" }}>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--blue-50)", color: "var(--blue-700)", borderRadius: 50, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
-                              <Star size={11} style={{ fill: "#f59e0b", color: "#f59e0b" }} />
-                              {item.rating}/5
-                            </span>
-                            <p style={{ fontSize: 11, color: "var(--gray-400)", margin: "6px 0 0" }}>{new Date(item.createdAt).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        <p style={{ color: "var(--gray-700)", fontSize: 13.5, lineHeight: 1.65, margin: 0 }}>{item.comment || "No written feedback"}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Collapsible>
-            </div>
           </div>
 
-          {/* ── Booking card ── */}
-          <div className="fade-up fade-up-2">
+          {/* ── Right column: Availability + Booking ── */}
+          <div className="fade-up fade-up-2" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div className="dp-booking-card">
-              {/* Top accent line */}
-              <div style={{ height: 4, background: "linear-gradient(90deg,var(--blue-700),var(--blue-400))", borderRadius: "4px 4px 0 0", margin: "-28px -28px 24px" }} />
-
               <h3 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 18, color: "var(--gray-900)", marginBottom: 6 }}>Book a Session</h3>
               <p style={{ fontSize: 13, color: "var(--gray-400)", margin: "0 0 20px" }}>Secure your appointment instantly</p>
 
@@ -613,12 +623,110 @@ export default function DoctorProfilePage() {
                 </div>
               </div>
             </div>
+
+            <div className="dp-card fade-up fade-up-4">
+              <Collapsible title="Care Highlights" icon={<Star size={20} style={{ color: "#f59e0b", fill: "#f59e0b" }} />}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[
+                    "Digital prescriptions after consultation",
+                    "Follow-up guidance for ongoing care",
+                    "Patient-friendly explanations",
+                  ].map((item) => (
+                    <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--blue-500)", marginTop: 6, flexShrink: 0 }} />
+                      <span style={{ color: "var(--gray-700)", fontSize: 14 }}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </Collapsible>
+            </div>
           </div>
 
         </div>
+
+        {/* ── Full width: About + Reviews ── */}
+        <div style={{ maxWidth: 920, margin: "24px auto 0", display: "flex", flexDirection: "column", gap: 20 }}>
+          {doctor.about && (
+            <div className="dp-card fade-up fade-up-4">
+              <Collapsible title="About" icon={<span style={{ fontSize: 18 }}>👤</span>}>
+                <p style={{ color: "var(--gray-700)", lineHeight: 1.75, fontSize: 15, margin: 0 }}>{doctor.about}</p>
+              </Collapsible>
+            </div>
+          )}
+
+          <div className="dp-card fade-up fade-up-5">
+            <Collapsible
+              title={`Reviews (${reviewsData.totalReviews})`}
+              icon={<Star size={20} style={{ color: "#f59e0b", fill: "#f59e0b" }} />}
+            >
+              {/* Rating summary bar */}
+              {reviewsData.totalReviews > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 0 24px", borderBottom: "1px solid var(--gray-100)", marginBottom: 20 }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 48, fontWeight: 800, color: "var(--blue-700)", lineHeight: 1 }}>
+                      {reviewsData.averageRating.toFixed(1)}
+                    </div>
+                    <Stars rating={reviewsData.averageRating} />
+                    <p style={{ fontSize: 12, color: "var(--gray-400)", margin: "6px 0 0" }}>{reviewsData.totalReviews} reviews</p>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div className="dp-rating-bar-bg" style={{ marginBottom: 8 }}>
+                      <div className="dp-rating-bar-fill" style={{ width: `${ratingPct}%` }} />
+                    </div>
+                    <p style={{ margin: 0, fontSize: 12, color: "var(--gray-500)" }}>Overall satisfaction</p>
+                  </div>
+                </div>
+              )}
+
+              {reviewsData.reviews.length === 0 ? (
+                <p style={{ color: "var(--gray-400)", fontSize: 14, textAlign: "center", padding: "24px 0" }}>No reviews yet</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {(showAllReviews ? reviewsData.reviews : reviewsData.reviews.slice(0, 2)).map((item) => (
+                    <div key={item._id} className="dp-review">
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                        <div>
+                          <p style={{ fontWeight: 700, fontSize: 14, color: "var(--gray-900)", margin: "0 0 4px" }}>{item.patientName}</p>
+                          <Stars rating={item.rating} />
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--blue-50)", color: "var(--blue-700)", borderRadius: 50, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
+                            <Star size={11} style={{ fill: "#f59e0b", color: "#f59e0b" }} />
+                            {item.rating}/5
+                          </span>
+                          <p style={{ fontSize: 11, color: "var(--gray-400)", margin: "6px 0 0" }}>{new Date(item.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <p style={{ color: "var(--gray-700)", fontSize: 13.5, lineHeight: 1.65, margin: 0 }}>{item.comment || "No written feedback"}</p>
+                    </div>
+                  ))}
+                  {reviewsData.reviews.length > 2 && !showAllReviews && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllReviews(true)}
+                      style={{
+                        alignSelf: "center",
+                        padding: "10px 16px",
+                        borderRadius: 10,
+                        border: "1px solid var(--blue-200)",
+                        background: "var(--blue-50)",
+                        color: "var(--blue-700)",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontSize: 13,
+                      }}
+                    >
+                      View all reviews
+                    </button>
+                  )}
+                </div>
+              )}
+            </Collapsible>
+          </div>
+        </div>
       </div>
 
-      {!isPatientLayoutView && <PublicFooter />}
+      {showPublicShell && <PublicFooter />}
     </div>
   );
 }

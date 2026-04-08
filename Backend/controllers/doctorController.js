@@ -3,7 +3,9 @@ import User from "../models/User.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import Appointment from "../models/Appointment.js";
 import DoctorAvailability from "../models/DoctorAvailability.js";
+import { APPOINTMENT_STATUS } from "../utils/appointmentStatus.js";
 import AppointmentReview from "../models/AppointmentReview.js";
+import { sendEmail } from "../utils/sendEmail.js";
 
 // --- Slot Generation Logic ---
 
@@ -520,10 +522,18 @@ export const getDoctorDashboard = async (req, res) => {
     const appointments = (await Appointment.find({ doctor: doctor._id })
       .populate("patient", "name email")) || [];
 
-    const totalEarnings = appointments.reduce((acc, a) => acc + (a?.fees || 0), 0);
+    const excludedStatuses = new Set([
+      APPOINTMENT_STATUS.CANCELLED,
+      APPOINTMENT_STATUS.REJECTED,
+      APPOINTMENT_STATUS.NO_SHOW
+    ]);
+
+    const earningsAppointments = appointments.filter((a) => !excludedStatuses.has(a?.status));
+
+    const totalEarnings = earningsAppointments.reduce((acc, a) => acc + (a?.fees || 0), 0);
 
     const currentMonth = new Date().getMonth();
-    const thisMonthEarnings = appointments
+    const thisMonthEarnings = earningsAppointments
       .filter(a => a?.date && !isNaN(new Date(a.date)))
       .filter(a => new Date(a.date).getMonth() === currentMonth)
       .reduce((acc, a) => acc + (a?.fees || 0), 0);
@@ -545,13 +555,20 @@ export const getDoctorDashboard = async (req, res) => {
         price: a?.fees || 0,
       })) || [];
 
-    const averageRating = doctor?.ratings?.length
-      ? doctor.ratings.reduce((acc, r) => acc + (r || 0), 0) / doctor.ratings.length
+    const reviews = await AppointmentReview.find({ doctorId: doctor._id }).select("rating").lean();
+    const averageRating = reviews.length
+      ? reviews.reduce((acc, r) => acc + (r?.rating || 0), 0) / reviews.length
       : 0;
+
+    const successfulStatuses = new Set([
+      APPOINTMENT_STATUS.CONSULTATION_COMPLETED,
+      APPOINTMENT_STATUS.COMPLETED,
+      APPOINTMENT_STATUS.FOLLOW_UP
+    ]);
 
     const appointmentSuccessRate = appointmentsCount
       ? Math.round(
-          (appointments.filter(a => a?.status === "confirmed").length || 0) / appointmentsCount * 100
+          (appointments.filter(a => successfulStatuses.has(a?.status)).length || 0) / appointmentsCount * 100
         )
       : 0;
 
@@ -580,6 +597,57 @@ export const getDoctorDashboard = async (req, res) => {
       appointmentSuccessRate: 0,
       avgResponseTime: 24
     });
+  }
+};
+
+export const sendDoctorMessage = async (req, res) => {
+  try {
+    const { appointmentId, subject, message } = req.body || {};
+
+    if (!appointmentId) {
+      return res.status(400).json({ message: "Appointment is required" });
+    }
+    if (!message || !String(message).trim()) {
+      return res.status(400).json({ message: "Message is required" });
+    }
+
+    const doctor = await Doctor.findOne({ user: req.user._id });
+    if (!doctor) return res.status(404).json({ message: "Doctor not found" });
+
+    const appointment = await Appointment.findOne({ _id: appointmentId, doctor: doctor._id })
+      .populate("patient", "name email")
+      .lean();
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    const patientEmail = appointment.patient?.email;
+    if (!patientEmail) {
+      return res.status(400).json({ message: "Patient email not available" });
+    }
+
+    const doctorName = req.user?.name || "Doctor";
+    const safeSubject = (subject && String(subject).trim()) || `Message from Dr. ${doctorName}`;
+    const safeMessage = String(message).trim();
+    const apptDate = appointment.date ? new Date(appointment.date).toDateString() : "";
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">${safeSubject}</h2>
+        <p>Hi ${appointment.patient?.name || "Patient"},</p>
+        <p>${safeMessage.replace(/\n/g, "<br/>")}</p>
+        ${apptDate ? `<p><strong>Appointment:</strong> ${apptDate} at ${appointment.time || ""}</p>` : ""}
+        <p>Regards,<br/>Dr. ${doctorName}</p>
+      </div>
+    `;
+
+    await sendEmail(patientEmail, safeSubject, html);
+
+    res.json({ message: "Message sent successfully" });
+  } catch (error) {
+    console.error("sendDoctorMessage error:", error);
+    res.status(500).json({ message: "Failed to send message" });
   }
 };
 
@@ -643,7 +711,7 @@ export const getDoctorReviews = async (req, res) => {
 // Get doctor by ID
 export const getDoctorById = async (req, res) => {
   try {
-    const doctor = await Doctor.findById(req.params.id).populate("user", "name email");
+    const doctor = await Doctor.findById(req.params.id).populate("user", "name email age");
     if (!doctor) return res.status(404).json({ message: "Doctor not found" });
     res.json(doctor);
   } catch (error) {

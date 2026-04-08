@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { Search, Eye, Trash2, Loader2, Users, Mail, Phone, X } from "lucide-react";
 import API from "../util/api";
 import { showToast } from "../../Redux/toastSlice";
@@ -11,7 +12,7 @@ function useLazyReveal(threshold = 0.08) {
     const el = ref.current; if (!el) return;
     const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); io.disconnect(); } }, { threshold });
     io.observe(el); return () => io.disconnect();
-  }, []);
+  }, [threshold]);
   return [ref, visible];
 }
 function Reveal({ children, delay = 0, style = {} }) {
@@ -21,6 +22,7 @@ function Reveal({ children, delay = 0, style = {} }) {
 
 export default function ManagePatients() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search,        setSearch]        = useState("");
   const [patients,      setPatients]      = useState([]);
   const [loading,       setLoading]       = useState(true);
@@ -128,6 +130,7 @@ export default function ManagePatients() {
                         </div>
                         <div style={{ display:"flex", gap:"8px", justifyContent:"center" }}>
                           <button title="View" style={{ width:"32px", height:"32px", borderRadius:"8px", border:"1px solid #dbeafe", background:"#f8faff", color:"#2563eb", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}
+                            onClick={() => navigate(`/admin/patients/${p.id}`)}
                             onMouseEnter={e=>{e.currentTarget.style.background="#eff6ff";e.currentTarget.style.borderColor="#93c5fd";}}
                             onMouseLeave={e=>{e.currentTarget.style.background="#f8faff";e.currentTarget.style.borderColor="#dbeafe";}}>
                             <Eye size={14}/>

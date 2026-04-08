@@ -8,11 +8,14 @@ import {
   FileText, Settings, UserCheck, LogOut,
   ChevronLeft, ChevronRight, User,
 } from "lucide-react";
+import { useSiteName } from "../../utils/siteName";
 
 export default function AdminSidebar() {
   const dispatch  = useDispatch();
   const navigate  = useNavigate();
   const { user }  = useSelector((state) => state.auth);
+  const siteName  = useSiteName();
+  const siteInitial = siteName.trim().charAt(0).toUpperCase() || "H";
 
   const [collapsed,  setCollapsed]  = useState(false);
   const [open,       setOpen]       = useState(false);
@@ -68,7 +71,7 @@ export default function AdminSidebar() {
           {collapsed ? (
             <>
               <div style={{ width:`${ICON_SIZE}px`, height:`${ICON_SIZE}px`, borderRadius:"10px", background:"linear-gradient(135deg,#2563eb,#38bdf8)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:"800", fontSize:"17px", flexShrink:0 }}>
-                A
+                {siteInitial}
               </div>
               <button onClick={()=>setCollapsed(false)} title="Expand" style={{ width:"26px", height:"26px", borderRadius:"50%", background:"#2563eb", border:"2px solid #fff", boxShadow:"0 2px 8px rgba(37,99,235,.3)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"#fff", flexShrink:0, padding:0 }}>
                 <ChevronRight size={13}/>
@@ -77,9 +80,11 @@ export default function AdminSidebar() {
           ) : (
             <>
               <div style={{ display:"flex", alignItems:"center", gap:"8px", minWidth:0 }}>
-                <div style={{ width:"32px", height:"32px", borderRadius:"8px", background:"linear-gradient(135deg,#2563eb,#38bdf8)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:"800", fontSize:"16px", flexShrink:0 }}>A</div>
+                <div style={{ width:"32px", height:"32px", borderRadius:"8px", background:"linear-gradient(135deg,#2563eb,#38bdf8)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:"800", fontSize:"16px", flexShrink:0 }}>
+                  {siteInitial}
+                </div>
                 <div style={{ minWidth:0 }}>
-                  <h1 style={{ fontSize:"15px", fontWeight:"700", color:"#1e3a5f", margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>Happy Health</h1>
+                  <h1 style={{ fontSize:"15px", fontWeight:"700", color:"#1e3a5f", margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{siteName}</h1>
                   <p style={{ fontSize:"10px", color:"#64748b", margin:0 }}>Admin Panel</p>
                 </div>
               </div>
@@ -209,7 +214,7 @@ export default function AdminSidebar() {
         {/* Footer */}
         {!collapsed && (
           <p style={{ margin:"12px 0 0", fontSize:"11px", color:"#94a3b8", textAlign:"center" }}>
-            © {new Date().getFullYear()} Happy Health
+            © {new Date().getFullYear()} {siteName}
           </p>
         )}
       </div>

@@ -20,13 +20,29 @@ export default function MyAppointments() {
   const [reviewModal, setReviewModal] = useState({ open: false, appointmentId: null, rating: 5, comment: "" });
   const [selectedPrescription, setSelectedPrescription] = useState(null);
 
+  const toTimestamp = (appointment) => {
+    if (!appointment) return 0;
+    if (appointment.date && appointment.time) {
+      const parsed = new Date(`${appointment.date} ${appointment.time}`);
+      if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+    }
+    if (appointment.date) {
+      const parsed = new Date(appointment.date);
+      if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+    }
+    const created = new Date(appointment.createdAt || 0);
+    return Number.isNaN(created.getTime()) ? 0 : created.getTime();
+  };
+
   const loadAppointments = async () => {
     try {
       const [appointmentsRes, remindersRes] = await Promise.all([
         API.get("/appointments/my"),
         API.get("/appointments/my/reminders")
       ]);
-      setAppointments(appointmentsRes.data || []);
+      const list = Array.isArray(appointmentsRes.data) ? appointmentsRes.data : [];
+      const sorted = [...list].sort((a, b) => toTimestamp(b) - toTimestamp(a));
+      setAppointments(sorted);
       setReminders(remindersRes.data || []);
     } catch (err) {
       dispatch(showToast({ message: err.response?.data?.message || "Failed to load appointments", type: "error" }));
@@ -87,6 +103,7 @@ export default function MyAppointments() {
     pending: appointments.filter((a) => a.status === "pending").length,
     approved: appointments.filter((a) => a.status === "approved").length,
     completed: appointments.filter((a) => ["consultation-completed", "completed"].includes(a.status)).length,
+    rejected: appointments.filter((a) => a.status === "rejected").length,
   }), [appointments]);
 
   const markArrived = async (id) => {
@@ -157,6 +174,12 @@ export default function MyAppointments() {
     if (s === "cancelled") return { color: "#dc2626", bg: "#fef2f2", border: "#fecaca" };
     if (s === "arrived") return { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc" };
     return { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" };
+  };
+
+  const formatDoctorName = (name) => {
+    if (!name) return "Doctor";
+    const trimmed = String(name).trim();
+    return trimmed.replace(/^dr\.?\s+/i, "");
   };
 
   // Shared inline button style helper
@@ -234,7 +257,7 @@ export default function MyAppointments() {
                   display: "flex", alignItems: "center", gap: "8px",
                 }}>
                   <Clock size={13} style={{ color: "#60a5fa", flexShrink: 0 }} />
-                  Dr. {item.doctor?.user?.name} • {item.date} • {item.time}
+                  Dr. {formatDoctorName(item.doctor?.user?.name || item.doctorName)} • {item.date} • {item.time}
                 </div>
               ))}
             </div>
@@ -242,11 +265,12 @@ export default function MyAppointments() {
         )}
 
         {/* ── STATS ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px" }}>
           {[
             { label: "Pending", value: stats.pending, color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
             { label: "Approved", value: stats.approved, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
             { label: "Completed", value: stats.completed, color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" },
+            { label: "Rejected", value: stats.rejected, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
           ].map((s) => (
             <div key={s.label} style={{
               background: "#fff", borderRadius: "14px",
@@ -291,7 +315,7 @@ export default function MyAppointments() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
                         <div>
                           <p style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#1e3a5f" }}>
-                            Dr. {appt.doctor?.user?.name}
+                            Dr. {formatDoctorName(appt.doctor?.user?.name || appt.doctorName)}
                           </p>
                           <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#2563eb", fontWeight: "500" }}>
                             {appt.doctor?.specialization}
@@ -318,6 +342,12 @@ export default function MyAppointments() {
 
                       {/* Timeline */}
                       {timeline(appt.status)}
+
+                      {String(appt.status || "").toLowerCase() === "cancelled" && appt.cancellationReason && (
+                        <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#b45309", fontWeight: "500" }}>
+                          Cancellation reason: {appt.cancellationReason}
+                        </p>
+                      )}
 
                       {/* Action buttons */}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "14px" }}>

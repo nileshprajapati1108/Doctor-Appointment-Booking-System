@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { showToast } from "../../Redux/toastSlice";
+import { getSiteName, setSiteName, getSiteEmail, setSiteEmail } from "../../utils/siteName";
+import API from "../util/api";
 
 /* ─── lazy reveal ─── */
 function useLazyReveal(threshold = 0.08) {
@@ -196,7 +198,8 @@ export default function Settings() {
   const dispatch = useDispatch();
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
-    siteName: "Happy Health",
+    siteName: getSiteName(),
+    siteEmail: getSiteEmail(),
     emailNotifications: true,
     smsNotifications: false,
     timezone: "Asia/Kolkata",
@@ -208,9 +211,28 @@ export default function Settings() {
   };
 
   const handleSave = async () => {
+    if (!settings.siteEmail.trim()) {
+      dispatch(showToast({ message: "Support email is required", type: "warning" }));
+      return;
+    }
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.siteEmail.trim());
+    if (!emailOk) {
+      dispatch(showToast({ message: "Please enter a valid support email", type: "warning" }));
+      return;
+    }
     setSaving(true);
     await new Promise(r => setTimeout(r, 600));
-    dispatch(showToast({ message:"Settings saved successfully!", type:"success" }));
+    setSiteName(settings.siteName);
+    setSiteEmail(settings.siteEmail);
+    try {
+      await API.post("/admin/settings/test-email", {
+        email: settings.siteEmail.trim(),
+        siteName: settings.siteName.trim(),
+      });
+      dispatch(showToast({ message:"Settings saved. Email sent.", type:"success" }));
+    } catch (error) {
+      dispatch(showToast({ message: error.response?.data?.message || "Settings saved, but email failed", type: "warning" }));
+    }
     setSaving(false);
   };
 
@@ -254,6 +276,18 @@ export default function Settings() {
                 <input
                   type="text" name="siteName" value={settings.siteName} onChange={handleChange}
                   style={INP}
+                  onFocus={e=>e.target.style.borderColor="#93c5fd"}
+                  onBlur={e=>e.target.style.borderColor="#dbeafe"}
+                />
+              </div>
+
+              <div>
+                <label style={LBL}>Support Email</label>
+                <input
+                  type="email" name="siteEmail" value={settings.siteEmail} onChange={handleChange}
+                  style={INP}
+                  placeholder="support@example.com"
+                  required
                   onFocus={e=>e.target.style.borderColor="#93c5fd"}
                   onBlur={e=>e.target.style.borderColor="#dbeafe"}
                 />

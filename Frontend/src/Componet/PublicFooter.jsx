@@ -1,7 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { useSiteName, useSiteEmail } from "../utils/siteName";
 
 export default function PublicFooter() {
+  const siteName = useSiteName();
+  const siteInitial = siteName.trim().charAt(0).toUpperCase() || "H";
+  const siteEmail = useSiteEmail();
+
   return (
     <footer style={{ background: "#0f172a", padding: "52px 24px 28px", fontFamily: "'DM Sans','Segoe UI',sans-serif" }}>
       <div style={{ maxWidth: "1160px", margin: "0 auto" }}>
@@ -22,10 +27,10 @@ export default function PublicFooter() {
                   fontSize: "15px",
                 }}
               >
-                H
+                {siteInitial}
               </div>
               <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#fff", fontFamily: "'Sora',sans-serif" }}>
-                Happy Health
+                {siteName}
               </p>
             </div>
             <p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>Care that makes you smile</p>
@@ -94,7 +99,7 @@ export default function PublicFooter() {
             >
               Contact
             </p>
-            {["support@happyhealth.com", "1-800-HEALTH-1", "Available 24/7"].map((contact) => (
+            {[siteEmail, "1-800-HEALTH-1", "Available 24/7"].map((contact) => (
               <p key={contact} style={{ margin: "0 0 8px", fontSize: "13px", color: "#64748b" }}>
                 {contact}
               </p>
@@ -104,7 +109,7 @@ export default function PublicFooter() {
 
         <div style={{ borderTop: "1px solid #1e293b", paddingTop: "24px", textAlign: "center" }}>
           <p style={{ margin: 0, fontSize: "12px", color: "#475569" }}>
-            Copyright {new Date().getFullYear()} Happy Health. All rights reserved.
+            Copyright {new Date().getFullYear()} {siteName}. All rights reserved.
           </p>
         </div>
       </div>
