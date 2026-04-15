@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, User, CalendarDays, ShieldCheck, Stethoscope, Clock3, Pill, FileText } from "lucide-react";
+import { ArrowLeft, Mail, Phone, User, CalendarDays, ShieldCheck, Stethoscope, Clock3, Pill, FileText, MapPin } from "lucide-react";
 import API from "../util/api";
+import { formatDate } from "../../utils/helpers";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -115,7 +116,10 @@ export default function PatientProfileView() {
     );
   }
 
-  const joinedOn = patient.createdAt ? new Date(patient.createdAt).toLocaleDateString() : "N/A";
+  const joinedOn = formatDate(patient.createdAt, "N/A");
+  const displayGender = String(patient.gender || "").trim() || "N/A";
+  const displayAddress = patient.residentialAddress || patient.address || "N/A";
+  const lastAppointmentDate = formatDate(lastAppointment?.date, lastAppointment?.date || "N/A");
 
   return (
     <div className="pp-root" style={{ minHeight: "100vh", background: "var(--pp-gray-50)" }}>
@@ -146,6 +150,8 @@ export default function PatientProfileView() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               <span className="pp-chip"><Mail size={14} />{patient.email || "N/A"}</span>
               <span className="pp-chip"><Phone size={14} />{patient.phone || patient.mobileNumber || "N/A"}</span>
+              <span className="pp-chip"><User size={14} />{displayGender}</span>
+              <span className="pp-chip"><MapPin size={14} />{displayAddress}</span>
               <span className="pp-chip"><ShieldCheck size={14} />{patient.isVerified ? "Verified" : "Unverified"}</span>
             </div>
           </div>
@@ -158,6 +164,8 @@ export default function PatientProfileView() {
               <InfoRow icon={<User size={16} />} label="Full Name" value={patient.name || "N/A"} />
               <InfoRow icon={<Mail size={16} />} label="Email" value={patient.email || "N/A"} />
               <InfoRow icon={<Phone size={16} />} label="Phone" value={patient.phone || patient.mobileNumber || "N/A"} />
+              <InfoRow icon={<User size={16} />} label="Gender" value={displayGender} />
+              <InfoRow icon={<MapPin size={16} />} label="Address" value={displayAddress} />
               <InfoRow icon={<ShieldCheck size={16} />} label="Role" value={patient.role || "patient"} />
               <InfoRow icon={<CalendarDays size={16} />} label="Joined On" value={joinedOn} />
               <InfoRow icon={<ShieldCheck size={16} />} label="Status" value={patient.isVerified ? "Verified" : "Unverified"} />
@@ -168,7 +176,7 @@ export default function PatientProfileView() {
             <SectionTitle icon={<Stethoscope size={16} />} title="Last Appointment Details" />
             {lastAppointment ? (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <InfoRow icon={<CalendarDays size={16} />} label="Date" value={lastAppointment.date || "N/A"} />
+                <InfoRow icon={<CalendarDays size={16} />} label="Date" value={lastAppointmentDate} />
                 <InfoRow icon={<Clock3 size={16} />} label="Time" value={lastAppointment.time || "N/A"} />
                 <InfoRow icon={<ShieldCheck size={16} />} label="Status" value={lastAppointment.status || "N/A"} />
                 <InfoRow icon={<Stethoscope size={16} />} label="Doctor" value={lastAppointment.doctorName || "N/A"} />

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Home, User, Calendar, BookOpen,
-  LogOut, Settings, ChevronLeft, ChevronRight,
+  LogOut, Settings, ChevronLeft, ChevronRight, FileBarChart2,
 } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { logout } from "../../Redux/authSlice";
@@ -28,6 +28,7 @@ export default function DoctorSidebar() {
     { path: "/doctor/profile", label: "Profile", icon: <User size={18} /> },
     { path: "/doctor/calendar", label: "Calendar", icon: <Calendar size={18} /> },
     { path: "/doctor/bookings", label: "Bookings", icon: <BookOpen size={18} /> },
+    { path: "/doctor/report", label: "Report", icon: <FileBarChart2 size={18} /> },
   ];
 
   useEffect(() => {

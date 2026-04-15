@@ -7,6 +7,7 @@ import {
   TrendingUp,
   Activity,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import API from "../util/api";
 
 /* ─────────────────────────────────────────────
@@ -199,6 +200,7 @@ function ActivityItem({ emoji, bg, text, time, border }) {
 }
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalDoctors: 0,
     totalPatients: 0,
@@ -287,6 +289,27 @@ export default function AdminDashboard() {
               </p>
             </div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => navigate("/admin/report")}
+                style={{
+                  background: "rgba(255,255,255,0.18)",
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.25)",
+                  borderRadius: 50,
+                  padding: "8px 18px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                }}
+              >
+                <FileBarChart size={15} />
+                📊 Generate Report
+              </button>
               <div style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 50, padding: "8px 18px", fontSize: 13, fontWeight: 500, color: "white", display: "flex", alignItems: "center", gap: 8 }}>
                 <Activity size={15} />
                 System Online

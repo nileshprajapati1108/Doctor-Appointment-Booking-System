@@ -14,24 +14,87 @@ export default function MyAppointments() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, appointmentId: null, action: null });
   const [reviewModal, setReviewModal] = useState({ open: false, appointmentId: null, rating: 5, comment: "" });
   const [selectedPrescription, setSelectedPrescription] = useState(null);
 
+  const parseDateTime = (dateValue, timeValue) => {
+    if (!dateValue) return null;
+
+    let year;
+    let month;
+    let day;
+
+    const rawDate = String(dateValue).trim();
+    const isoMatch = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const dmyMatch = rawDate.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+    if (isoMatch) {
+      year = Number(isoMatch[1]);
+      month = Number(isoMatch[2]);
+      day = Number(isoMatch[3]);
+    } else if (dmyMatch) {
+      day = Number(dmyMatch[1]);
+      month = Number(dmyMatch[2]);
+      year = Number(dmyMatch[3]);
+    } else {
+      const fallback = new Date(rawDate);
+      if (Number.isNaN(fallback.getTime())) return null;
+      year = fallback.getFullYear();
+      month = fallback.getMonth() + 1;
+      day = fallback.getDate();
+    }
+
+    let hours = 0;
+    let minutes = 0;
+
+    if (timeValue) {
+      const rawTime = String(timeValue).trim().toLowerCase();
+      const timeMatch = rawTime.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+      if (!timeMatch) return null;
+
+      hours = Number(timeMatch[1]);
+      minutes = Number(timeMatch[2]);
+      const period = timeMatch[3];
+
+      if (period) {
+        if (period === "pm" && hours !== 12) hours += 12;
+        if (period === "am" && hours === 12) hours = 0;
+      }
+    }
+
+    return new Date(year, month - 1, day, hours, minutes, 0, 0);
+  };
+
   const toTimestamp = (appointment) => {
     if (!appointment) return 0;
-    if (appointment.date && appointment.time) {
-      const parsed = new Date(`${appointment.date} ${appointment.time}`);
-      if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+
+    const parsedDateTime = parseDateTime(appointment.date, appointment.time);
+    if (parsedDateTime && !Number.isNaN(parsedDateTime.getTime())) {
+      return parsedDateTime.getTime();
     }
-    if (appointment.date) {
-      const parsed = new Date(appointment.date);
-      if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+
+    const parsedDateOnly = parseDateTime(appointment.date, null);
+    if (parsedDateOnly && !Number.isNaN(parsedDateOnly.getTime())) {
+      return parsedDateOnly.getTime();
     }
+
     const created = new Date(appointment.createdAt || 0);
     return Number.isNaN(created.getTime()) ? 0 : created.getTime();
+  };
+
+  const sortAppointments = (list = []) => {
+    return [...list].sort((a, b) => {
+      const timeDiff = toTimestamp(b) - toTimestamp(a);
+      if (timeDiff !== 0) return timeDiff;
+
+      const createdA = new Date(a?.createdAt || 0).getTime();
+      const createdB = new Date(b?.createdAt || 0).getTime();
+      return createdB - createdA;
+    });
   };
 
   const loadAppointments = async () => {
@@ -41,7 +104,7 @@ export default function MyAppointments() {
         API.get("/appointments/my/reminders")
       ]);
       const list = Array.isArray(appointmentsRes.data) ? appointmentsRes.data : [];
-      const sorted = [...list].sort((a, b) => toTimestamp(b) - toTimestamp(a));
+      const sorted = sortAppointments(list);
       setAppointments(sorted);
       setReminders(remindersRes.data || []);
     } catch (err) {
@@ -99,12 +162,41 @@ export default function MyAppointments() {
     );
   };
 
-  const stats = useMemo(() => ({
-    pending: appointments.filter((a) => a.status === "pending").length,
-    approved: appointments.filter((a) => a.status === "approved").length,
-    completed: appointments.filter((a) => ["consultation-completed", "completed"].includes(a.status)).length,
-    rejected: appointments.filter((a) => a.status === "rejected").length,
-  }), [appointments]);
+  const normalizedStatusForFilter = (statusValue) => {
+    const status = String(statusValue || "").toLowerCase();
+    if (status === "consultation-completed") return "completed";
+    if (status === "no-show") return "rejected";
+    return status;
+  };
+
+  const stats = useMemo(() => {
+    return appointments.reduce(
+      (acc, appointment) => {
+        const status = normalizedStatusForFilter(appointment?.status);
+        if (status === "pending") acc.pending += 1;
+        if (status === "approved") acc.approved += 1;
+        if (status === "completed") acc.completed += 1;
+        if (status === "cancelled") acc.cancelled += 1;
+        if (status === "rejected") acc.rejected += 1;
+        return acc;
+      },
+      { pending: 0, approved: 0, completed: 0, cancelled: 0, rejected: 0 }
+    );
+  }, [appointments]);
+
+  const filterButtons = useMemo(() => ([
+    { key: "all", label: "All", count: appointments.length },
+    { key: "pending", label: "Pending", count: stats.pending },
+    { key: "approved", label: "Approved", count: stats.approved },
+    { key: "completed", label: "Completed", count: stats.completed },
+    { key: "cancelled", label: "Cancelled", count: stats.cancelled },
+    { key: "rejected", label: "Rejected", count: stats.rejected },
+  ]), [appointments.length, stats]);
+
+  const filteredAppointments = useMemo(() => {
+    if (statusFilter === "all") return appointments;
+    return appointments.filter((appointment) => normalizedStatusForFilter(appointment?.status) === statusFilter);
+  }, [appointments, statusFilter]);
 
   const markArrived = async (id) => {
     try {
@@ -265,24 +357,67 @@ export default function MyAppointments() {
         )}
 
         {/* ── STATS ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "14px" }}>
           {[
-            { label: "Pending", value: stats.pending, color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
-            { label: "Approved", value: stats.approved, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
-            { label: "Completed", value: stats.completed, color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" },
-            { label: "Rejected", value: stats.rejected, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
-          ].map((s) => (
-            <div key={s.label} style={{
-              background: "#fff", borderRadius: "14px",
-              padding: "18px", textAlign: "center",
-              border: `1px solid ${s.border}`,
-              boxShadow: "0 2px 10px rgba(37,99,235,0.06)",
-            }}>
-              <p style={{ margin: 0, fontSize: "28px", fontWeight: "800", color: s.color }}>{s.value}</p>
-              <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#94a3b8", fontWeight: "500" }}>{s.label}</p>
-            </div>
-          ))}
+            { key: "pending", label: "Pending", value: stats.pending, color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
+            { key: "approved", label: "Approved", value: stats.approved, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
+            { key: "completed", label: "Completed", value: stats.completed, color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" },
+            { key: "cancelled", label: "Cancelled", value: stats.cancelled, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
+            { key: "rejected", label: "Rejected", value: stats.rejected, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
+          ].map((s) => {
+            const active = statusFilter === s.key;
+            return (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => setStatusFilter(s.key)}
+                style={{
+                  background: active ? s.bg : "#fff",
+                  borderRadius: "14px",
+                  padding: "18px",
+                  textAlign: "center",
+                  border: active ? `2px solid ${s.color}` : `1px solid ${s.border}`,
+                  boxShadow: active
+                    ? "0 8px 20px rgba(37,99,235,0.16)"
+                    : "0 2px 10px rgba(37,99,235,0.06)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "28px", fontWeight: "800", color: s.color }}>{s.value}</p>
+                <p style={{ margin: "4px 0 0", fontSize: "12px", color: active ? s.color : "#94a3b8", fontWeight: active ? "700" : "500" }}>{s.label}</p>
+              </button>
+            );
+          })}
         </div>
+
+        {/* ── FILTERS ── */}
+        {appointments.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {filterButtons.map((filter) => {
+              const active = statusFilter === filter.key;
+              return (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setStatusFilter(filter.key)}
+                  style={{
+                    border: active ? "none" : "1px solid #bfdbfe",
+                    background: active ? "linear-gradient(135deg,#2563eb,#38bdf8)" : "#eff6ff",
+                    color: active ? "#fff" : "#1e3a8a",
+                    borderRadius: "999px",
+                    padding: "7px 12px",
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                  }}
+                >
+                  {filter.label} ({filter.count})
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* ── APPOINTMENTS LIST ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -294,8 +429,18 @@ export default function MyAppointments() {
               <ClipboardList size={36} style={{ color: "#bfdbfe", margin: "0 auto 10px" }} />
               <p style={{ color: "#94a3b8", fontSize: "14px" }}>No appointments yet.</p>
             </div>
+          ) : filteredAppointments.length === 0 ? (
+            <div style={{
+              background: "#fff", borderRadius: "16px", padding: "48px",
+              textAlign: "center", border: "1px solid #dbeafe",
+            }}>
+              <ClipboardList size={36} style={{ color: "#bfdbfe", margin: "0 auto 10px" }} />
+              <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
+                No {statusFilter} appointments found.
+              </p>
+            </div>
           ) : (
-            appointments.map((appt) => {
+            filteredAppointments.map((appt) => {
               const sc = statusStyle(appt.status);
               return (
                 <div key={appt._id} style={{

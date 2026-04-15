@@ -255,18 +255,20 @@ function SkeletonCard() {
 
 /* ─── Status pill ────────────────────────────────────────── */
 function StatusPill({ status }) {
+  const safeStatus = status === "no-show" ? "cancelled" : status;
+
   const cls = {
     pending: "pill-pending", approved: "pill-approved", arrived: "pill-arrived",
     "consultation-started": "pill-started", "consultation-completed": "pill-completed",
-    cancelled: "pill-cancelled", rejected: "pill-rejected", "no-show": "pill-noshow"
-  }[status] || "";
+    cancelled: "pill-cancelled", rejected: "pill-rejected"
+  }[safeStatus] || "";
 
-  const dot = { pending: "#f59e0b", approved: "#3b82f6", arrived: "#06b6d4", "consultation-started": "#6366f1", "consultation-completed": "#0e9f6e", cancelled: "#ef4444", rejected: "#ef4444", "no-show": "#f97316" }[status] || "#94a3b8";
+  const dot = { pending: "#f59e0b", approved: "#3b82f6", arrived: "#06b6d4", "consultation-started": "#6366f1", "consultation-completed": "#0e9f6e", cancelled: "#ef4444", rejected: "#ef4444" }[safeStatus] || "#94a3b8";
 
   return (
     <span className={`pill ${cls}`}>
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot, flexShrink: 0 }} />
-      {status.replaceAll("-", " ")}
+      {safeStatus.replaceAll("-", " ")}
     </span>
   );
 }
@@ -300,6 +302,41 @@ function Field({ label, children, style }) {
 export default function DoctorBookings() {
   const dispatch = useDispatch();
 
+  const getAppointmentTimestamp = useCallback((item = {}) => {
+    const datePart = String(item?.date || "").trim();
+    const timePart = String(item?.time || "").trim();
+
+    if (datePart && timePart) {
+      const combined = new Date(`${datePart} ${timePart}`);
+      if (!Number.isNaN(combined.getTime())) return combined.getTime();
+    }
+
+    if (datePart) {
+      const dateOnly = new Date(datePart);
+      if (!Number.isNaN(dateOnly.getTime())) return dateOnly.getTime();
+    }
+
+    return 0;
+  }, []);
+
+  const sortByUpcomingDateTime = useCallback((a, b) => {
+    const nowTs = Date.now();
+    const aTs = getAppointmentTimestamp(a);
+    const bTs = getAppointmentTimestamp(b);
+
+    const aIsUpcoming = aTs >= nowTs;
+    const bIsUpcoming = bTs >= nowTs;
+
+    if (aIsUpcoming && !bIsUpcoming) return -1;
+    if (!aIsUpcoming && bIsUpcoming) return 1;
+
+    if (aIsUpcoming && bIsUpcoming) {
+      return aTs - bTs;
+    }
+
+    return bTs - aTs;
+  }, [getAppointmentTimestamp]);
+
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -312,6 +349,7 @@ export default function DoctorBookings() {
   const [messageModal, setMessageModal] = useState({ open: false, appointment: null, subject: "", body: "" });
   const [messageSending, setMessageSending] = useState(false);
   const [cancelDialog, setCancelDialog] = useState({ open: false, appointment: null, reason: "" });
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -332,13 +370,38 @@ export default function DoctorBookings() {
     return () => socket.off("appointmentStatusUpdate", fetchBookings);
   }, [fetchBookings]);
 
-  const grouped = useMemo(() => {
-    return bookings.reduce((acc, item) => {
+  const normalizeStatusForFilter = useCallback((status) => {
+    const value = String(status || "").toLowerCase();
+    if (value === "consultation-completed") return "completed";
+    if (value === "no-show") return "rejected";
+    return value;
+  }, []);
+
+  const filteredBookings = useMemo(() => {
+    if (statusFilter === "all") return bookings;
+    return bookings.filter((booking) => normalizeStatusForFilter(booking?.status) === statusFilter);
+  }, [bookings, statusFilter, normalizeStatusForFilter]);
+
+  const { grouped, sortedDateKeys } = useMemo(() => {
+    const groupedMap = filteredBookings.reduce((acc, item) => {
       if (!acc[item.date]) acc[item.date] = [];
       acc[item.date].push(item);
       return acc;
     }, {});
-  }, [bookings]);
+
+    const keys = Object.keys(groupedMap).sort((a, b) =>
+      sortByUpcomingDateTime(
+        { date: a, time: "00:00" },
+        { date: b, time: "00:00" }
+      )
+    );
+
+    keys.forEach((dateKey) => {
+      groupedMap[dateKey] = [...groupedMap[dateKey]].sort(sortByUpcomingDateTime);
+    });
+
+    return { grouped: groupedMap, sortedDateKeys: keys };
+  }, [filteredBookings, sortByUpcomingDateTime]);
 
   const openClinical = async (appointment) => {
     setSelected(appointment);
@@ -472,6 +535,32 @@ export default function DoctorBookings() {
     });
   };
 
+  const bookingStats = useMemo(() => {
+    return bookings.reduce(
+      (acc, booking) => {
+        const status = String(booking?.status || "").toLowerCase();
+
+        if (status === "pending") acc.pending += 1;
+        if (status === "approved") acc.approved += 1;
+        if (status === "consultation-completed" || status === "completed") acc.completed += 1;
+        if (status === "cancelled") acc.cancelled += 1;
+        if (status === "rejected" || status === "no-show") acc.rejected += 1;
+
+        return acc;
+      },
+      { pending: 0, approved: 0, completed: 0, cancelled: 0, rejected: 0 }
+    );
+  }, [bookings]);
+
+  const filterButtons = useMemo(() => ([
+    { key: "all", label: "All", count: bookings.length },
+    { key: "pending", label: "Pending", count: bookingStats.pending },
+    { key: "approved", label: "Approved", count: bookingStats.approved },
+    { key: "completed", label: "Completed", count: bookingStats.completed },
+    { key: "cancelled", label: "Cancelled", count: bookingStats.cancelled },
+    { key: "rejected", label: "Rejected", count: bookingStats.rejected },
+  ]), [bookings.length, bookingStats]);
+
   const canCancel = (status) => ["pending", "approved", "arrived"].includes((status || "").toLowerCase());
 
   return (
@@ -485,6 +574,71 @@ export default function DoctorBookings() {
             <h1>Doctor Appointments</h1>
             <p>Status flow: Pending → Approved → Arrived → Consultation Started → Completed</p>
           </div>
+
+          {!loading && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 12, marginBottom: 18 }}>
+              {[
+                { key: "pending", label: "Pending", value: bookingStats.pending, color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
+                { key: "approved", label: "Approved", value: bookingStats.approved, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
+                { key: "completed", label: "Completed", value: bookingStats.completed, color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" },
+                { key: "cancelled", label: "Cancelled", value: bookingStats.cancelled, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
+                { key: "rejected", label: "Rejected", value: bookingStats.rejected, color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" },
+              ].map((item) => {
+                const active = statusFilter === item.key;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter(item.key)}
+                    key={item.key}
+                    style={{
+                      background: active ? item.bg : "#fff",
+                      borderRadius: 14,
+                      padding: "14px 12px",
+                      border: active ? `2px solid ${item.color}` : `1px solid ${item.border}`,
+                      boxShadow: active
+                        ? "0 8px 20px rgba(37,99,235,0.16)"
+                        : "0 2px 10px rgba(37,99,235,0.06)",
+                      textAlign: "center",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: item.color }}>{item.value}</p>
+                    <p style={{ margin: "3px 0 0", fontSize: 12, color: active ? item.color : "#64748b", fontWeight: active ? 700 : 600 }}>
+                      {item.label}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {!loading && bookings.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              {filterButtons.map((filter) => {
+                const active = statusFilter === filter.key;
+                return (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    onClick={() => setStatusFilter(filter.key)}
+                    style={{
+                      border: active ? "none" : "1px solid #bfdbfe",
+                      background: active ? "linear-gradient(135deg,#2563eb,#38bdf8)" : "#eff6ff",
+                      color: active ? "#fff" : "#1e3a8a",
+                      borderRadius: 999,
+                      padding: "6px 12px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {filter.label} ({filter.count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Skeleton loading */}
           {loading && (
@@ -509,8 +663,18 @@ export default function DoctorBookings() {
             </div>
           )}
 
+          {!loading && bookings.length > 0 && filteredBookings.length === 0 && (
+            <div className="empty-state">
+              <div className="empty-icon"><AlertTriangle size={24} color="var(--azure)" /></div>
+              <p style={{ fontFamily: "'DM Serif Display', serif", fontSize: 21, color: "var(--slate)", margin: "0 0 6px" }}>
+                No {statusFilter} appointments found
+              </p>
+              <p style={{ color: "var(--mist)", fontSize: 15, margin: 0 }}>Filter change karke dusri appointment details dekh sakte ho.</p>
+            </div>
+          )}
+
           {/* Appointment list */}
-          {!loading && Object.keys(grouped).sort().map((dateKey) => (
+          {!loading && filteredBookings.length > 0 && sortedDateKeys.map((dateKey) => (
             <section key={dateKey} style={{ marginBottom: 28 }}>
               <div className="date-header">
                 <Calendar size={15} />
@@ -585,11 +749,6 @@ export default function DoctorBookings() {
                       {item.status === "consultation-started" && (
                         <button className="btn btn-success" onClick={() => askAction(item._id, "Complete Consultation", `/appointments/${item._id}/complete-consultation`)} disabled={actionLoading.id === item._id}>
                           <CheckCircle2 size={14} /> Complete Consultation
-                        </button>
-                      )}
-                      {item.status === "approved" && (
-                        <button className="btn btn-warn" onClick={() => askAction(item._id, "Mark No-show", `/appointments/${item._id}`)} disabled={actionLoading.id === item._id}>
-                          <AlertTriangle size={14} /> No-show
                         </button>
                       )}
                       {canCancel(item.status) && (
@@ -844,11 +1003,11 @@ export default function DoctorBookings() {
           message={`Are you sure you want to ${String(confirmDialog.action || "").toLowerCase()}?`}
           confirmText={confirmDialog.action || "Confirm"}
           backdropClassName="bg-blue-900/20 backdrop-blur-sm"
-          isDangerous={["Reject", "Mark No-show"].includes(confirmDialog.action)}
+          isDangerous={["Reject"].includes(confirmDialog.action)}
           onConfirm={async () => {
             if (!confirmDialog.endpoint) return;
             if (confirmDialog.endpoint.endsWith("/appointments/" + confirmDialog.appointmentId)) {
-              const statusMap = { Approve: "approved", Reject: "rejected", "Mark No-show": "no-show" };
+              const statusMap = { Approve: "approved", Reject: "rejected" };
               try {
                 setActionLoading({ id: confirmDialog.appointmentId, type: confirmDialog.action });
                 await API.put(`/appointments/${confirmDialog.appointmentId}`, { status: statusMap[confirmDialog.action] });

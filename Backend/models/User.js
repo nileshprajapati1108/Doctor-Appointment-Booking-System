@@ -10,13 +10,16 @@ const userSchema = new mongoose.Schema({
   isVerified: { type: Boolean, default: false },         // ✅ email verification
   verificationToken: { type: String },                  // ✅ verification token
   // Doctor-specific fields
-  age: { type: Number },
+  age: { type: String, default: "" },
+  gender: { type: String, enum: ["male", "female", "other", ""], default: "" },
   mobileNumber: { type: String },
   residentialAddress: { type: String },
   isApproved: { type: Boolean, default: false },        // For doctors: approval status
   mustResetPassword: { type: Boolean, default: false }, // Force password reset on first login
   tempPassword: { type: String },                      // Temporary password (hashed)
   isFirstLogin: { type: Boolean, default: false },    // Track first login after approval (for profile setup)
+  resetPasswordToken: { type: String },
+  resetPasswordExpire: { type: Date },
   medicalHistory: {
     bloodGroup: { type: String, default: "" },
     allergies: { type: String, default: "" },

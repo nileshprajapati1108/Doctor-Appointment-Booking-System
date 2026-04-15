@@ -27,7 +27,7 @@ export default function AdminSidebar() {
     { path: "/admin/doctors",        label: "Doctors",         icon: <Stethoscope size={22} /> },
     { path: "/admin/patients",       label: "Patients",        icon: <Users size={22} /> },
     { path: "/admin/appointments",   label: "Appointments",    icon: <CalendarDays size={22} /> },
-    { path: "/admin/report",         label: "Reports",         icon: <FileText size={22} /> },
+    { path: "/admin/report",         label: "Report",            icon: <FileText size={22} /> },
   
   ];
 

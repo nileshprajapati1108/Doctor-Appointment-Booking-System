@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { showToast } from "../../Redux/toastSlice";
 import API from "../util/api";
+import { formatDate } from "../../utils/helpers";
 import {
   CheckCircle2, XCircle, Eye, EyeOff, Clock,
   Stethoscope, X, Loader2, AlertTriangle,
@@ -104,7 +105,7 @@ function ApprovalSkeleton() {
 }
 
 function DR({ label, value }) {
-  if (!value) return null;
+  if (value === undefined || value === null || value === "") return null;
   return (
     <div className="da-detail-row">
       <span className="da-detail-key">{label}</span>
@@ -232,7 +233,7 @@ export default function DoctorApproval() {
                       <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:17, color:"var(--da-gray-900)", margin:"0 0 4px" }}>{req.fullName}</h3>
                       <p style={{ fontSize:13, color:"var(--da-gray-500)", margin:"0 0 3px" }}>{req.email}</p>
                       <p style={{ fontSize:11, color:"var(--da-gray-400)", margin:0, display:"flex", alignItems:"center", gap:4 }}>
-                        <Clock size={11}/> Submitted {new Date(req.submittedAt).toLocaleDateString()}
+                        <Clock size={11}/> Submitted {formatDate(req.submittedAt, "N/A")}
                       </p>
                     </div>
                     <span className="da-badge-pending"><Clock size={10}/> Pending</span>
@@ -287,8 +288,7 @@ export default function DoctorApproval() {
                   <DR label="Experience"      value={`${selectedRequest.yearsOfExperience} years`}/>
                   <DR label="Hospital/Clinic" value={selectedRequest.hospitalClinicName}/>
                   <DR label="Clinic Address"  value={selectedRequest.hospitalClinicAddress}/>
-                  <DR label="Online Fees"     value={`₹${selectedRequest.consultationFeesOnline}`}/>
-                  <DR label="Offline Fees"    value={`₹${selectedRequest.consultationFeesOffline}`}/>
+                  <DR label="Fees"            value={`₹${Number(selectedRequest.fees || 0)}`}/>
                   <div style={{ display:"flex", gap:10, marginTop:22 }}>
                     <button className="da-btn da-btn-approve" style={{ flex:1 }} onClick={()=>handleApprove(selectedRequest._id)} disabled={actionLoading===selectedRequest._id}>
                       <CheckCircle2 size={14}/> {actionLoading===selectedRequest._id?"…":"Approve"}

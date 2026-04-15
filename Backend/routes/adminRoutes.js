@@ -10,7 +10,9 @@ import {
   approveDoctorRequest,
   getDashboard,
   rejectDoctorRequest,
-  sendTestEmail
+  sendTestEmail,
+  generateReport,
+  generateSampleReport
 } from "../controllers/adminController.js";
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
 
@@ -22,6 +24,10 @@ router.delete("/doctors/:id", protect, adminOnly, deleteDoctor);
 
 // Dashboard
 router.get("/dashboard", protect, adminOnly, getDashboard);
+router.get("/generate-report", protect, adminOnly, generateReport);
+
+// Temporary unauthenticated sample PDF endpoint for quick local testing
+router.get("/sample-report", generateSampleReport);
 
 // Patient management
 router.get("/patients", protect, adminOnly, getAllPatients);

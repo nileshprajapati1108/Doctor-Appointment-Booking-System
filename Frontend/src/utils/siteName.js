@@ -17,7 +17,12 @@ export const setSiteName = (name) => {
 
 export const getSiteEmail = () => {
   const stored = localStorage.getItem("siteEmail");
-  return stored && stored.trim() ? stored.trim() : DEFAULT_SITE_EMAIL;
+  const clean = (stored || "").trim().toLowerCase();
+  if (!clean || clean !== DEFAULT_SITE_EMAIL) {
+    localStorage.setItem("siteEmail", DEFAULT_SITE_EMAIL);
+    return DEFAULT_SITE_EMAIL;
+  }
+  return DEFAULT_SITE_EMAIL;
 };
 
 export const setSiteEmail = (email) => {

@@ -6,12 +6,17 @@ export const APPOINTMENT_NOTIFICATION_STATUSES = new Set([
   "consultation-completed",
   "cancelled",
   "rejected",
-  "no-show",
   "rescheduled",
   "follow-up"
 ]);
 
 const STORAGE_PREFIX = "dismissedStatusNotifications";
+
+const normalizeDoctorName = (name) => {
+  const raw = String(name || "").trim();
+  const withoutPrefix = raw.replace(/^dr\.?\s+/i, "").trim();
+  return withoutPrefix || "Doctor";
+};
 
 const toTimestamp = (value) => {
   const parsed = new Date(value);
@@ -56,6 +61,7 @@ export const appendDismissedNotificationIds = ({ userId, role, ids }) => {
 
 const statusMessage = (appointment, role) => {
   const doctorName = appointment?.doctor?.user?.name || "Doctor";
+  const doctorLabel = `Dr. ${normalizeDoctorName(doctorName)}`;
   const patientName = appointment?.patient?.name || "Patient";
   const dateText = `${appointment?.date || ""} ${appointment?.time || ""}`.trim();
 
@@ -63,35 +69,35 @@ const statusMessage = (appointment, role) => {
     case "pending":
       return role === "doctor"
         ? `New appointment request from ${patientName} (${dateText})`
-        : `Appointment request sent to Dr. ${doctorName}`;
+        : `Appointment request sent to ${doctorLabel}`;
     case "approved":
       return role === "doctor"
         ? `${patientName}'s appointment is approved (${dateText})`
-        : `Your appointment with Dr. ${doctorName} is approved`;
+        : `Your appointment with ${doctorLabel} is approved`;
     case "arrived":
       return role === "doctor"
         ? `${patientName} has arrived for consultation`
-        : `You checked in for Dr. ${doctorName}`;
+        : `You checked in for ${doctorLabel}`;
     case "consultation-started":
       return role === "doctor"
         ? `Consultation started with ${patientName}`
-        : `Consultation started with Dr. ${doctorName}`;
+        : `Consultation started with ${doctorLabel}`;
     case "consultation-completed":
       return role === "doctor"
         ? `Consultation completed with ${patientName}`
-        : `Consultation completed with Dr. ${doctorName}`;
+        : `Consultation completed with ${doctorLabel}`;
     case "cancelled":
       return role === "doctor"
         ? `${patientName}'s appointment was cancelled`
-        : `Appointment with Dr. ${doctorName} was cancelled`;
+        : `Appointment with ${doctorLabel} was cancelled`;
     case "rejected":
       return role === "doctor"
         ? `Appointment rejected for ${patientName}`
-        : `Appointment was rejected by Dr. ${doctorName}`;
+        : `Appointment was rejected by ${doctorLabel}`;
     case "no-show":
       return role === "doctor"
-        ? `${patientName} marked as no-show`
-        : `You were marked as no-show`;
+        ? `${patientName}'s appointment was cancelled`
+        : `Appointment with ${doctorLabel} was cancelled`;
     default:
       return `Appointment updated: ${appointment.status}`;
   }

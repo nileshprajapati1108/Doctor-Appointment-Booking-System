@@ -95,6 +95,8 @@ export default function Reports() {
   const [appointmentsData, setAppointmentsData] = useState([]);
   const [revenueData, setRevenueData] = useState([]);
   const [rangeLabel, setRangeLabel] = useState("Live Data");
+  
+  
 
   useEffect(() => {
     const loadReportData = async () => {
@@ -216,9 +218,13 @@ export default function Reports() {
                 <p style={{ margin:0, fontSize:"12px", color:"#64748b" }}>Analytics and performance metrics</p>
               </div>
             </div>
-            <div style={{ display:"flex", alignItems:"center", gap:"6px", padding:"8px 14px", borderRadius:"12px", background:"#eff6ff", border:"1px solid #bfdbfe" }}>
-              <TrendingUp size={14} style={{ color:"#2563eb" }}/>
-              <span style={{ fontSize:"12px", fontWeight:"700", color:"#2563eb" }}>{rangeLabel}</span>
+            <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"6px", padding:"8px 14px", borderRadius:"12px", background:"#eff6ff", border:"1px solid #bfdbfe" }}>
+                <TrendingUp size={14} style={{ color:"#2563eb" }}/>
+                <span style={{ fontSize:"12px", fontWeight:"700", color:"#2563eb" }}>{rangeLabel}</span>
+              </div>
+              
+              {/* Generate Report removed from admin portal */}
             </div>
           </div>
         </Reveal>

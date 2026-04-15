@@ -3,7 +3,10 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 import app from "./app.js";
-import { processAppointmentReminders } from "./services/reminderService.js";
+import {
+  processAppointmentReminders,
+  processExpiredUnarrivedAppointments
+} from "./services/reminderService.js";
 
 dotenv.config();
 
@@ -37,6 +40,14 @@ connectDB();
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log("🔴 Socket.io enabled");
+
+  setInterval(async () => {
+    try {
+      await processExpiredUnarrivedAppointments(io);
+    } catch (error) {
+      console.error("Auto-cancel worker failed:", error.message);
+    }
+  }, 60 * 1000);
 
   setInterval(async () => {
     try {

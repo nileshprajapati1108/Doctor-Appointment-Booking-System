@@ -5,18 +5,23 @@ import ProtectedRoute from "../Components/ProtectedRoute";
 import Home from "../pages/Home";
 import Login from "../pages/Auth/Login";
 import Signup from "../pages/Auth/Signup";
+import ForgotPassword from "../pages/Auth/ForgotPassword";
 import DoctorRegistrationStep1 from "../pages/Auth/DoctorRegistrationStep1";
 import DoctorRegistrationStep2 from "../pages/Auth/DoctorRegistrationStep2";
 import DoctorRegistrationConfirmation from "../pages/Auth/DoctorRegistrationConfirmation";
 import ResetPassword from "../pages/Auth/ResetPassword";
+import ResetPasswordFromLink from "../pages/Auth/ResetPasswordFromLink";
 import HowItWorks from "../pages/HowItWorks";
 import PublicDoctorProfile from "../pages/DoctorProfile";
+import PrivacyPolicy from "../pages/PrivacyPolicy";
+import TermsOfService from "../pages/TermsOfService";
 
 import DoctorLayout from "../Layouts/DoctorLayout";
 import DoctorDashboard from "../pages/Doctor/Dashboard";
 import DoctorProfile from "../pages/Doctor/Profile";
 import DoctorCalendar from "../pages/Doctor/Calendar";
 import DoctorBooking from "../pages/Doctor/Booking";
+import DoctorReport from "../pages/Doctor/Report";
 import DoctorSettings from "../pages/Doctor/Settings";
 
 import PatientLayout from "../Layouts/PatientLayout";
@@ -35,7 +40,7 @@ import PatientProfileView from "../pages/Admin/PatientProfileView";
 import ManageAppointments from "../pages/Admin/ManageAppointments";
 import AppointmentDetails from "../pages/Admin/AppointmentDetails";
 import DoctorApproval from "../pages/Admin/DoctorApproval";
-import Reports from "../pages/Admin/Reports";
+import ReportPage from "../pages/Admin/ReportPage";
 import Settings from "../pages/Admin/Seting";
 import AdminProfileSettings from "../pages/Admin/ProfileSettings";
 
@@ -45,11 +50,15 @@ export default function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/doctor-registration/step1" element={<DoctorRegistrationStep1 />} />
       <Route path="/doctor-registration/step2" element={<DoctorRegistrationStep2 />} />
       <Route path="/doctor-registration/confirmation" element={<DoctorRegistrationConfirmation />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPasswordFromLink />} />
       <Route path="/how-it-works" element={<HowItWorks />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
       <Route path="/browse-doctors" element={<BrowseServices />} />
       <Route path="/doctor/:id" element={<PublicDoctorProfile />} />
 
@@ -58,6 +67,7 @@ export default function AppRoutes() {
         <Route path="profile" element={<DoctorProfile />} />
         <Route path="calendar" element={<DoctorCalendar />} />
         <Route path="bookings" element={<DoctorBooking />} />
+        <Route path="report" element={<DoctorReport />} />
         <Route path="settings" element={<DoctorSettings />} />
       </Route>
 
@@ -80,7 +90,7 @@ export default function AppRoutes() {
         <Route path="patients/:id" element={<PatientProfileView />} />
         <Route path="appointments" element={<ManageAppointments />} />
         <Route path="appointments/:id" element={<AppointmentDetails />} />
-        <Route path="report" element={<Reports />} />
+        <Route path="report" element={<ReportPage />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

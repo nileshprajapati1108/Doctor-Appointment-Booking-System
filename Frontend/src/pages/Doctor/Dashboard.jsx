@@ -53,6 +53,23 @@ const statusStyle = (status) => {
   return { color: "#64748b", bg: "#f1f5f9", border: "#e2e8f0" };
 };
 
+const bookingTimestamp = (booking = {}) => {
+  const datePart = String(booking?.date || "").trim();
+  const timePart = String(booking?.time || "").trim();
+
+  if (datePart && timePart) {
+    const combined = new Date(`${datePart} ${timePart}`);
+    if (!Number.isNaN(combined.getTime())) return combined.getTime();
+  }
+
+  if (datePart) {
+    const dateOnly = new Date(datePart);
+    if (!Number.isNaN(dateOnly.getTime())) return dateOnly.getTime();
+  }
+
+  return 0;
+};
+
 /* ─────────────────────────────────────────
    Main Component
 ───────────────────────────────────────── */
@@ -296,7 +313,9 @@ export default function DoctorDashboard() {
 
             {dashboard.recentBookings?.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {dashboard.recentBookings.map((booking, i) => {
+                {[...(dashboard.recentBookings || [])]
+                  .sort((a, b) => bookingTimestamp(b) - bookingTimestamp(a))
+                  .map((booking, i) => {
                   const sc = statusStyle(booking.status);
                   return (
                     <Reveal key={i} delay={i * 70}>

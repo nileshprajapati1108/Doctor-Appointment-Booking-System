@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, CalendarDays, Clock3, Stethoscope, User, ShieldCheck, FileText, Pill } from "lucide-react";
 import API from "../util/api";
+import { formatDate } from "../../utils/helpers";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -136,7 +137,8 @@ export default function AppointmentDetails() {
   const fees = appointment.doctor?.fees || appointment.fees || "N/A";
   const followUp = appointment.prescription?.followUpDate || appointment.medicalReport?.followUpDate || null;
   const advice = appointment.prescription?.advice || "N/A";
-  const bookedOn = appointment.createdAt ? new Date(appointment.createdAt).toLocaleDateString() : "N/A";
+  const bookedOn = formatDate(appointment.createdAt, "N/A");
+  const appointmentDate = formatDate(appointment.date, appointment.date || "N/A");
 
   return (
     <div className="dp-root" style={{ minHeight: "100vh", background: "var(--dp-gray-50)" }}>
@@ -166,7 +168,7 @@ export default function AppointmentDetails() {
                 {doctorName} · {patientName}
               </h4>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                <span className="dp-badge"><CalendarDays size={14} />{appointment.date || "N/A"}</span>
+                <span className="dp-badge"><CalendarDays size={14} />{appointmentDate}</span>
                 <span className="dp-badge"><Clock3 size={14} />{appointment.time || "N/A"}</span>
                 <span className="dp-badge"><ShieldCheck size={14} />{appointment.status || "N/A"}</span>
               </div>
@@ -179,7 +181,7 @@ export default function AppointmentDetails() {
             <div className="dp-card">
             <SectionTitle icon={<Stethoscope size={16} />} title="Visit Details" />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-              <InfoRow icon={<CalendarDays size={16} />} label="Date" value={appointment.date || "N/A"} />
+              <InfoRow icon={<CalendarDays size={16} />} label="Date" value={appointmentDate} />
               <InfoRow icon={<Clock3 size={16} />} label="Time" value={appointment.time || "N/A"} />
               <InfoRow icon={<ShieldCheck size={16} />} label="Status" value={appointment.status || "N/A"} />
               <InfoRow icon={<User size={16} />} label="Patient" value={patientName} />
@@ -195,7 +197,7 @@ export default function AppointmentDetails() {
                 <InfoRow icon={<User size={16} />} label="Location" value={clinicLocation} />
                 <InfoRow icon={<ShieldCheck size={16} />} label="Fees" value={fees !== "N/A" ? `₹${fees}` : "N/A"} />
                 <InfoRow icon={<CalendarDays size={16} />} label="Booked On" value={bookedOn} />
-                <InfoRow icon={<Clock3 size={16} />} label="Follow-up" value={followUp ? new Date(followUp).toLocaleDateString() : "N/A"} />
+                <InfoRow icon={<Clock3 size={16} />} label="Follow-up" value={formatDate(followUp, "N/A")} />
               </div>
             </div>
           </div>

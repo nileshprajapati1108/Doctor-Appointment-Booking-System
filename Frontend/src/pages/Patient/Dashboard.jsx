@@ -51,7 +51,7 @@ export default function PatientDashboard() {
     if (s === "cancelled") return "appointment cancelled";
     if (s === "rejected") return "appointment rejected";
     if (s === "rescheduled") return "appointment rescheduled";
-    if (s === "no-show") return "marked as no-show";
+    if (s === "no-show") return "appointment cancelled";
     return "appointment updated";
   };
 

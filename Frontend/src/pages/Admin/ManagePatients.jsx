@@ -36,7 +36,16 @@ export default function ManagePatients() {
       setLoading(true);
       const res = await API.get("/admin/patients");
       const list = Array.isArray(res.data) ? res.data : [];
-      setPatients(list.map(p => ({ id:p._id, name:p.name||"N/A", email:p.email||"N/A", phone:p.phone||"N/A", status:"Active" })));
+      setPatients(
+        list.map((p) => ({
+          id: p._id,
+          name: p.name || "N/A",
+          email: p.email || "N/A",
+          phone: p.phone || p.mobileNumber || "N/A",
+          gender: p.gender || "N/A",
+          status: "Active",
+        }))
+      );
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -54,7 +63,8 @@ export default function ManagePatients() {
   const filtered = patients.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.email.toLowerCase().includes(search.toLowerCase()) ||
-    p.phone.includes(search)
+    p.phone.includes(search) ||
+    p.gender.toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) return (
@@ -89,7 +99,7 @@ export default function ManagePatients() {
           <div style={{ background:"#fff", borderRadius:"14px", padding:"16px 18px", border:"1px solid #dbeafe", boxShadow:"0 2px 10px rgba(37,99,235,.06)" }}>
             <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"9px 14px", borderRadius:"10px", border:"1px solid #dbeafe", background:"#f8faff" }}>
               <Search size={16} style={{ color:"#60a5fa", flexShrink:0 }}/>
-              <input type="text" placeholder="Search by name, email, or phone..." value={search} onChange={e=>setSearch(e.target.value)}
+              <input type="text" placeholder="Search by name, email, phone, or gender..." value={search} onChange={e=>setSearch(e.target.value)}
                 style={{ border:"none", outline:"none", background:"transparent", width:"100%", fontSize:"14px", color:"#1e3a5f", fontFamily:"inherit" }}/>
               {search && <button onClick={()=>setSearch("")} style={{ background:"none", border:"none", cursor:"pointer", color:"#94a3b8", padding:0, display:"flex" }}><X size={15}/></button>}
             </div>
@@ -98,9 +108,9 @@ export default function ManagePatients() {
 
         <Reveal delay={100}>
           <div style={{ background:"#fff", borderRadius:"18px", border:"1px solid #dbeafe", boxShadow:"0 2px 16px rgba(37,99,235,.07)", overflow:"hidden" }}>
-            <div style={{ display:"grid", gridTemplateColumns:"2fr 2fr 1.4fr 1fr 120px", background:"linear-gradient(135deg,#eff6ff,#f8faff)", borderBottom:"1px solid #dbeafe", padding:"12px 20px" }}>
-              {["Patient Name","Email","Phone","Status","Actions"].map((h,i) => (
-                <div key={i} style={{ fontSize:"11px", fontWeight:"700", color:"#64748b", textTransform:"uppercase", letterSpacing:"0.07em", textAlign:i===4?"center":"left" }}>{h}</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1.8fr 2.2fr 1.3fr 1fr 1fr 120px", background:"linear-gradient(135deg,#eff6ff,#f8faff)", borderBottom:"1px solid #dbeafe", padding:"12px 20px" }}>
+              {["Patient Name","Email","Phone","Gender","Status","Actions"].map((h,i) => (
+                <div key={i} style={{ fontSize:"11px", fontWeight:"700", color:"#64748b", textTransform:"uppercase", letterSpacing:"0.07em", textAlign:i===5?"center":"left" }}>{h}</div>
               ))}
             </div>
 
@@ -110,7 +120,7 @@ export default function ManagePatients() {
                   const isDeleting = actionLoading.id===p.id && actionLoading.type==="delete";
                   return (
                     <Reveal key={p.id} delay={i*40}>
-                      <div style={{ display:"grid", gridTemplateColumns:"2fr 2fr 1.4fr 1fr 120px", padding:"13px 20px", borderBottom:i<filtered.length-1?"1px solid #f1f5f9":"none", alignItems:"center", transition:"background .15s" }}
+                      <div style={{ display:"grid", gridTemplateColumns:"1.8fr 2.2fr 1.3fr 1fr 1fr 120px", padding:"13px 20px", borderBottom:i<filtered.length-1?"1px solid #f1f5f9":"none", alignItems:"center", transition:"background .15s" }}
                         onMouseEnter={e=>e.currentTarget.style.background="#f8faff"}
                         onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                         <div style={{ display:"flex", alignItems:"center", gap:"10px", minWidth:0 }}>
@@ -124,6 +134,9 @@ export default function ManagePatients() {
                         <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
                           <Phone size={13} style={{ color:"#60a5fa", flexShrink:0 }}/>
                           <span style={{ fontSize:"13px", color:"#475569" }}>{p.phone}</span>
+                        </div>
+                        <div>
+                          <span style={{ fontSize:"13px", color:"#475569", textTransform:"capitalize" }}>{p.gender || "N/A"}</span>
                         </div>
                         <div>
                           <span style={{ padding:"3px 10px", borderRadius:"20px", fontSize:"11px", fontWeight:"700", color:"#059669", background:"#ecfdf5", border:"1px solid #a7f3d0" }}>{p.status}</span>

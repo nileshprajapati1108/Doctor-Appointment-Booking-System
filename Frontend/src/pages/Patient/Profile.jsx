@@ -3,7 +3,7 @@ import API from "../util/api";
 import { useDispatch } from "react-redux";
 import { loginSuccess } from "../../Redux/authSlice";
 import { showToast } from "../../Redux/toastSlice";
-import { User, Mail, Lock, Droplets, AlertCircle, Heart, Pill, Loader2, Save, ChevronDown, Check } from "lucide-react";
+import { User, Mail, Lock, Droplets, AlertCircle, Heart, Pill, Loader2, Save, ChevronDown, Check, Phone, MapPin, Venus } from "lucide-react";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
 
@@ -12,16 +12,34 @@ export default function PatientProfile() {
   const auth = JSON.parse(localStorage.getItem("auth")) || {};
   const user = auth.user || {};
 
+  const pickNonEmpty = (...values) => {
+    for (const value of values) {
+      if (value === undefined || value === null) continue;
+      if (typeof value === "string") {
+        if (value.trim() === "") continue;
+        return value;
+      }
+      return value;
+    }
+    return "";
+  };
+
+  const normalizeMedicalHistory = (history) => ({
+    bloodGroup: history?.bloodGroup ?? "",
+    allergies: history?.allergies ?? "",
+    chronicDiseases: history?.chronicDiseases ?? "",
+    pastSurgeries: history?.pastSurgeries ?? "",
+    currentMedications: history?.currentMedications ?? "",
+  });
+
   const [name, setName] = useState(user.name || "");
   const [email, setEmail] = useState(user.email || "");
+  const [age, setAge] = useState(user.age || "");
+  const [gender, setGender] = useState(user.gender || "");
+  const [mobileNumber, setMobileNumber] = useState(user.mobileNumber || "");
+  const [residentialAddress, setResidentialAddress] = useState(user.residentialAddress || "");
   const [password, setPassword] = useState("");
-  const [medicalHistory, setMedicalHistory] = useState({
-    bloodGroup: user.medicalHistory?.bloodGroup || "",
-    allergies: user.medicalHistory?.allergies || "",
-    chronicDiseases: user.medicalHistory?.chronicDiseases || "",
-    pastSurgeries: user.medicalHistory?.pastSurgeries || "",
-    currentMedications: user.medicalHistory?.currentMedications || "",
-  });
+  const [medicalHistory, setMedicalHistory] = useState(normalizeMedicalHistory(user.medicalHistory));
   const [loading, setLoading] = useState(false);
   const [bgDropdownOpen, setBgDropdownOpen] = useState(false);
   const bgDropdownRef = useRef(null);
@@ -30,9 +48,13 @@ export default function PatientProfile() {
     const fetchProfile = async () => {
       try {
         const { data } = await API.get("/auth/verify");
-        setName(data.name || "");
-        setEmail(data.email || "");
-        if (data.medicalHistory) setMedicalHistory(data.medicalHistory);
+        setName(pickNonEmpty(data.name, user.name));
+        setEmail(pickNonEmpty(data.email, user.email));
+        setAge(pickNonEmpty(data.age, user.age));
+        setGender(pickNonEmpty(data.gender, user.gender));
+        setMobileNumber(pickNonEmpty(data.mobileNumber, user.mobileNumber));
+        setResidentialAddress(pickNonEmpty(data.residentialAddress, user.residentialAddress));
+        setMedicalHistory(normalizeMedicalHistory(data.medicalHistory ?? user.medicalHistory));
       } catch (err) {}
     };
     fetchProfile();
@@ -51,9 +73,38 @@ export default function PatientProfile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const cleanName = name.trim();
+    const cleanAge = String(age || "").trim();
+    const cleanGender = String(gender || "").trim().toLowerCase();
+    const cleanMobile = String(mobileNumber || "").trim();
+    const cleanAddress = String(residentialAddress || "").trim();
+
+    if (!cleanName) {
+      dispatch(showToast({ message: "Full name is required", type: "error" }));
+      return;
+    }
+
+    if (!/^\d{1,3}$/.test(cleanAge) || Number(cleanAge) < 1 || Number(cleanAge) > 120) {
+      dispatch(showToast({ message: "Please enter a valid age between 1 and 120", type: "error" }));
+      return;
+    }
+
+    if (!["male", "female", "other"].includes(cleanGender)) {
+      dispatch(showToast({ message: "Please select gender", type: "error" }));
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload = { name, email, medicalHistory };
+      const payload = {
+        name: cleanName,
+        age: cleanAge,
+        gender: cleanGender,
+        mobileNumber: cleanMobile,
+        residentialAddress: cleanAddress,
+        medicalHistory,
+      };
       if (password) payload.password = password;
       const { data } = await API.put("/auth/profile", payload);
       dispatch(loginSuccess(data));
@@ -128,7 +179,7 @@ export default function PatientProfile() {
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: "#1e3a5f" }}>Your Profile</h1>
-            <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>Update your personal information and password</p>
+            <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>Update your personal details and medical history (email cannot be changed)</p>
           </div>
         </div>
 
@@ -166,6 +217,103 @@ export default function PatientProfile() {
                 </div>
               </div>
 
+              {/* Age */}
+              <div>
+                <label style={labelStyle}><User size={11} /> Age</label>
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#60a5fa", pointerEvents: "none" }}>
+                    <User size={15} />
+                  </span>
+                  <input
+                    value={age}
+                    onChange={(e) => setAge(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
+                    required
+                    placeholder="Enter your age"
+                    inputMode="numeric"
+                    style={{ ...inputStyle, paddingLeft: "38px" }}
+                    onFocus={(e) => e.target.style.borderColor = "#93c5fd"}
+                    onBlur={(e) => e.target.style.borderColor = "#dbeafe"}
+                  />
+                </div>
+              </div>
+
+              {/* Gender */}
+              <div>
+                <label style={labelStyle}><Venus size={11} /> Gender</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
+                  {[
+                    { label: "Male", value: "male" },
+                    { label: "Female", value: "female" },
+                    { label: "Other", value: "other" },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      style={{
+                        border: `1px solid ${gender === option.value ? "#60a5fa" : "#dbeafe"}`,
+                        borderRadius: "10px",
+                        padding: "10px 8px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: gender === option.value ? "#eff6ff" : "#f8faff",
+                        color: "#1e3a5f",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="patientGender"
+                        value={option.value}
+                        checked={gender === option.value}
+                        onChange={(e) => setGender(e.target.value)}
+                        style={{ accentColor: "#2563eb" }}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mobile Number */}
+              <div>
+                <label style={labelStyle}><Phone size={11} /> Mobile Number</label>
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#60a5fa", pointerEvents: "none" }}>
+                    <Phone size={15} />
+                  </span>
+                  <input
+                    value={mobileNumber}
+                    onChange={(e) => setMobileNumber(e.target.value)}
+                    placeholder="e.g. +91 9876543210"
+                    style={{ ...inputStyle, paddingLeft: "38px" }}
+                    onFocus={(e) => e.target.style.borderColor = "#93c5fd"}
+                    onBlur={(e) => e.target.style.borderColor = "#dbeafe"}
+                  />
+                </div>
+              </div>
+
+              {/* Residential Address */}
+              <div>
+                <label style={labelStyle}><MapPin size={11} /> Residential Address</label>
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: "12px", top: "14px", color: "#60a5fa", pointerEvents: "none" }}>
+                    <MapPin size={15} />
+                  </span>
+                  <textarea
+                    value={residentialAddress}
+                    onChange={(e) => setResidentialAddress(e.target.value)}
+                    rows={3}
+                    placeholder="Enter your full residential address"
+                    style={{ ...inputStyle, paddingLeft: "38px", paddingTop: "10px", resize: "none", lineHeight: "1.6" }}
+                    onFocus={(e) => e.target.style.borderColor = "#93c5fd"}
+                    onBlur={(e) => e.target.style.borderColor = "#dbeafe"}
+                  />
+                </div>
+              </div>
+
               {/* Email */}
               <div>
                 <label style={labelStyle}><Mail size={11} /> Email Address</label>
@@ -174,11 +322,18 @@ export default function PatientProfile() {
                     <Mail size={15} />
                   </span>
                   <input
-                    value={email} onChange={(e) => setEmail(e.target.value)}
-                    type="email" required placeholder="Enter your email"
-                    style={{ ...inputStyle, paddingLeft: "38px" }}
-                    onFocus={(e) => e.target.style.borderColor = "#93c5fd"}
-                    onBlur={(e) => e.target.style.borderColor = "#dbeafe"}
+                    value={email}
+                    type="email"
+                    disabled
+                    readOnly
+                    placeholder="Email cannot be changed"
+                    style={{
+                      ...inputStyle,
+                      paddingLeft: "38px",
+                      background: "#f1f5f9",
+                      color: "#64748b",
+                      cursor: "not-allowed",
+                    }}
                   />
                 </div>
               </div>

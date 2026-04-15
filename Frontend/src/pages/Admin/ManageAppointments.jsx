@@ -4,6 +4,7 @@ import { useDispatch } from "react-redux";
 import { Search, Eye, CheckCircle2, XCircle, Trash2, Loader2, Calendar, Clock, X, User, Stethoscope } from "lucide-react";
 import API from "../util/api";
 import { showToast } from "../../Redux/toastSlice";
+import { formatDate } from "../../utils/helpers";
 
 function useLazyReveal(threshold = 0.08) {
   const ref = useRef(null);
@@ -50,7 +51,7 @@ export default function ManageAppointments() {
         doctor: a.doctor?.user?.name || "N/A",
         doctorImage: a.doctor?.profileImage || a.doctor?.user?.profileImage || "",
         patient: a.patient?.name || "N/A",
-        date: a.date || "N/A",
+        date: formatDate(a.date, a.date || "N/A"),
         time: a.time || "N/A",
         status: a.status || "pending"
       })));

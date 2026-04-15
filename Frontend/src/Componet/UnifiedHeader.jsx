@@ -10,6 +10,7 @@ import {
   getDismissedNotificationIds
 } from "../utils/statusNotifications";
 import { getInitials } from "../utils/initials";
+import { formatDate } from "../utils/helpers";
 
 export default function UnifiedHeader() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -154,7 +155,7 @@ export default function UnifiedHeader() {
                           </p>
                           <p className="text-xs text-slate-400 mt-1">
                             {notif.createdAt
-                              ? new Date(notif.createdAt).toLocaleDateString()
+                              ? formatDate(notif.createdAt, "Just now")
                               : "Just now"}
                           </p>
                         </div>

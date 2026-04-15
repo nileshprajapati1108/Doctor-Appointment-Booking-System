@@ -441,6 +441,10 @@ export const adminUpdateAppointmentStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid status" });
     }
 
+    if (status === APPOINTMENT_STATUS.NO_SHOW) {
+      return res.status(400).json({ message: "No-show status is no longer supported" });
+    }
+
     const appointment = await findAppointmentById(req.params.id, [
       { path: "patient", select: "name email _id" },
       { path: "doctor", select: "user", populate: { path: "user", select: "name email _id" } }
@@ -452,7 +456,7 @@ export const adminUpdateAppointmentStatus = async (req, res) => {
     appointment.status = status;
     await appointment.save();
 
-    if ([APPOINTMENT_STATUS.CANCELLED, APPOINTMENT_STATUS.NO_SHOW].includes(status) && appointment.slotId) {
+    if (status === APPOINTMENT_STATUS.CANCELLED && appointment.slotId) {
       await releaseSlotIfExists(appointment.slotId);
     }
 
@@ -641,6 +645,10 @@ export const updateAppointmentStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid status" });
     }
 
+    if (status === APPOINTMENT_STATUS.NO_SHOW) {
+      return res.status(400).json({ message: "No-show status is no longer supported" });
+    }
+
     const appointment = await findAppointmentById(req.params.id, [
       { path: "patient", select: "name email" },
       { path: "doctor", select: "user", populate: { path: "user", select: "name email _id" } }
@@ -653,15 +661,6 @@ export const updateAppointmentStatus = async (req, res) => {
 
     if (!canTransitionStatus(appointment.status, status)) {
       return res.status(400).json({ message: `Invalid status transition from ${appointment.status} to ${status}` });
-    }
-
-    if (status === APPOINTMENT_STATUS.NO_SHOW) {
-      const appointmentDateTime = parseAppointmentDateTime(appointment.date, appointment.time);
-      if (!appointmentDateTime) return res.status(400).json({ message: "Invalid appointment date/time" });
-      const diffMs = Date.now() - appointmentDateTime.getTime();
-      if (diffMs < 15 * 60 * 1000) {
-        return res.status(400).json({ message: "No-show can only be set 15 minutes after appointment time" });
-      }
     }
 
     if (status === APPOINTMENT_STATUS.CONSULTATION_COMPLETED) {
@@ -691,7 +690,7 @@ export const updateAppointmentStatus = async (req, res) => {
 
     await appointment.save();
 
-    if ([APPOINTMENT_STATUS.CANCELLED, APPOINTMENT_STATUS.NO_SHOW].includes(status) && appointment.slotId) {
+    if (status === APPOINTMENT_STATUS.CANCELLED && appointment.slotId) {
       await releaseSlotIfExists(appointment.slotId);
     }
 
