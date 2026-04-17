@@ -474,6 +474,12 @@ export default function DoctorReport() {
     if (key === "dateRange") {
       return row?.dateRange || `${reportRange.from} - ${reportRange.to}`;
     }
+
+    // Use display formatter for CSV when available (e.g. percentage -> "45%")
+    if (column.formatter) {
+      return column.formatter(row?.[key], row);
+    }
+
     const value = row?.[key];
     if (value === undefined || value === null || value === "") return "-";
     return value;
